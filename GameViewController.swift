@@ -6,6 +6,8 @@
 //  Copyright (c) 2016 Larisa Carli. All rights reserved.
 //
 
+
+	
 import UIKit
 import SceneKit
 import Darwin
@@ -13,6 +15,10 @@ import SpriteKit
 import ModelIO
 
 enum PlayerCurrentDirection {
+	case Forward, Backward, Right, Left
+}
+
+enum CameraCurrentDirection {
 	case Forward, Backward, Right, Left
 }
 
@@ -37,11 +43,13 @@ class GameViewController: UIViewController {
 	let pi = CGFloat(M_PI)
 	let stepDistance: Float = 0.5
 	var playerDirection = PlayerCurrentDirection.Forward
+	var playerCameraDirection = PlayerCurrentDirection.Forward
 	var playerMoving = false
 	var playerVelocityMagnitude: Float = 2.0
+	var currentLevel: Int = 0
 	
 	var scnView: SCNView!
-	var level1Scene: SCNScene!
+	var levelScene: SCNScene!
 	var cameraNode: SCNNode!
 	var playerCamera: SCNNode!
 	var playerLight: SCNNode!
@@ -53,6 +61,7 @@ class GameViewController: UIViewController {
 	var newGameCamera: SCNNode!
 	
 	var playerNode: SCNNode!
+	var player: SCNNode!
 	var floor: SCNNode!
 	
 	//HUD
@@ -61,25 +70,33 @@ class GameViewController: UIViewController {
 	
 	//gameplay variables
 	var gameState = GameState.TapToPlay
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
+	
+	override func viewDidLoad() {
+		super.viewDidLoad()
 		
+		setupView()
 		setupScene()
 		setupHUD()
 		setupNodes()
 		setupRotatingCamera()
-    }
+	}
+	
+	func setupView() {
+		scnView = self.view as! SCNView
+		scnView.delegate = self
+	}
 	
 	func setupScene() {
-		scnView = self.view as! SCNView
-		level1Scene = SCNScene(named: "Level1.scn")
-		level1Scene.physicsWorld.contactDelegate = self
-		scnView.scene = level1Scene
-
-		scnView.delegate = self
+		levelScene = sceneBasedOnLevel(1)!
+		scnView.scene = levelScene
 		
-		scnView.showsStatistics = true
+		levelScene.physicsWorld.contactDelegate = self
+	}
+	
+	func sceneBasedOnLevel(levelNumber: Int) -> SCNScene? {
+		let scene = SCNScene(named: "Level\(levelNumber).scn")
+		currentLevel = levelNumber
+		return scene
 	}
 	
 	func setupHUD() {
@@ -90,16 +107,16 @@ class GameViewController: UIViewController {
 	
 	func setupNodes() {
 		// player
-		playerNode = level1Scene.rootNode.childNodeWithName("playerNode", recursively: true)!
-		playerNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: nil)
+		playerNode = levelScene.rootNode.childNodeWithName("playerNode", recursively: true)!
+		player = levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
+		playerNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: SCNPhysicsShape(geometry:SCNSphere(radius: 0.15), options: nil))
 		playerNode.physicsBody?.affectedByGravity = false
-		playerNode.physicsBody?.angularVelocityFactor = SCNVector3Zero // so it can't rotate
 		playerNode.physicsBody?.categoryBitMask = PhysicsCategory.Player.rawValue
 		playerNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Floor.rawValue
 		playerNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Pearl.rawValue | PhysicsCategory.Enemy.rawValue
 		
 		
-		level1Scene.rootNode.enumerateChildNodesUsingBlock { node, stop in
+		levelScene.rootNode.enumerateChildNodesUsingBlock { node, stop in
 			if node.name == "wallObject reference" {
 				node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: SCNPhysicsShape(geometry: SCNBox(width: 0.1, height: 0.5, length: 0.5, chamferRadius: 1.0) , options: nil))
 				node.physicsBody?.categoryBitMask = PhysicsCategory.Wall.rawValue
@@ -107,44 +124,46 @@ class GameViewController: UIViewController {
 				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
 				node.name = "wall"
 			}
-			if node.name == "pearl reference" {
-				node.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-				node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl.rawValue
-				node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
-				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
-				node.name = "pearl"
-			}
-			if node.name == "enemy reference" {
-				node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: nil)
-				node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy.rawValue
-				node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
-				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
-				node.name = "enemy"
+			if self.currentLevel > 1 { //level 1 has no pearls or enemys
+				if node.name == "pearl reference" {
+					node.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl.rawValue
+					node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
+					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+					node.name = "pearl"
+				}
+				if node.name == "enemy reference" {
+					node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: nil)
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy.rawValue
+					node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
+					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+					node.name = "enemy"
+				}
 			}
 		}
 		
-		floor = level1Scene.rootNode.childNodeWithName("floorObject reference", recursively: true)!
+		floor = levelScene.rootNode.childNodeWithName("floorObject reference", recursively: true)!
 		floor.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
 		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor.rawValue
 		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player.rawValue
 		
-
+		
 		//particle systems:
 		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets")!
 		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets")!
-
+		
 		
 		// camera and lights
-		cameraNode = level1Scene.rootNode.childNodeWithName("cameraNode", recursively: true)!
-		playerCamera = level1Scene.rootNode.childNodeWithName("playerCamera", recursively: true)!
-		playerLight = level1Scene.rootNode.childNodeWithName("playerLight", recursively: true)!
-		playerSpotLight = level1Scene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
+		cameraNode = levelScene.rootNode.childNodeWithName("cameraNode", recursively: true)!
+		playerCamera = levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
+		playerLight = levelScene.rootNode.childNodeWithName("playerLight", recursively: true)!
+		playerSpotLight = levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
 		
 		playerCamera.constraints = [SCNLookAtConstraint(target: playerNode.presentationNode)]
 		playerSpotLight.constraints = [SCNLookAtConstraint(target: playerNode.presentationNode)]
 		
-		newGameCamera = level1Scene.rootNode.childNodeWithName("newGameCamera", recursively: true)!
-		newGameCameraSelfieStickNode = level1Scene.rootNode.childNodeWithName("newGameCameraSelfieStick", recursively: true)!
+		newGameCamera = levelScene.rootNode.childNodeWithName("newGameCamera", recursively: true)!
+		newGameCameraSelfieStickNode = levelScene.rootNode.childNodeWithName("newGameCameraSelfieStick", recursively: true)!
 		newGameCamera.constraints = [SCNLookAtConstraint(target: floor)]
 	}
 	
@@ -167,11 +186,11 @@ class GameViewController: UIViewController {
 		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
 		explosion.emitterShape = geometry
 		
-		level1Scene.addParticleSystem(explosion, withTransform: translationMatrix)
+		levelScene.addParticleSystem(explosion, withTransform: translationMatrix)
 	}
 	
 	func collisionWithNode(node: SCNNode) {
-		let geometry = node.name == "pearl" ? SCNSphere(radius: 0.1) : SCNTorus(ringRadius: 0.25, pipeRadius: 0.07)
+		let geometry = node.name == "pearl" ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
 		let position = node.presentationNode.position
 		let explosion = node.name == "pearl" ? pearlExplosionParticleSystem : enemyExplosionParticleSystem
 		node.runAction(SCNAction.fadeOutWithDuration(0.1))
@@ -184,6 +203,24 @@ class GameViewController: UIViewController {
 			// + points?
 		} else if node.name == "enemy" {
 			//gameOver()
+		}
+	}
+	
+	func updateCameraBasedOnPlayerDirection() {
+		cameraNode.position = playerNode.presentationNode.position
+		
+		//if player changed direction, we have to rotate the cameraNode (a selfie stick for playerCamera)
+		let playerChangedDirection = playerCameraDirection == playerDirection
+		if playerChangedDirection {
+			let rotateAction: SCNAction!
+		
+			switch playerCameraDirection {
+			case .Forward: rotateAction = SCNAction.rotateToX(0, y: 0, z: 0, duration: 0.1, shortestUnitArc: true)
+			case .Backward: rotateAction = SCNAction.rotateToX(0, y: pi, z: 0, duration: 0.1, shortestUnitArc: true)
+			case .Right: rotateAction = SCNAction.rotateToX(0, y: -pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
+			case .Left: rotateAction = SCNAction.rotateToX(0, y: pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
+			}
+			cameraNode.runAction(rotateAction)
 		}
 	}
 	
@@ -209,13 +246,13 @@ class GameViewController: UIViewController {
 	}
 	
 	override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		 playerMoving = false
-		 playerNode.physicsBody?.velocity = SCNVector3Zero
+		playerMoving = false
+		playerNode.physicsBody?.velocity = SCNVector3Zero
 	}
 	
-    override func shouldAutorotate() -> Bool { return true }
-    
-    override func prefersStatusBarHidden() -> Bool { return true }
+	override func shouldAutorotate() -> Bool { return true }
+	
+	override func prefersStatusBarHidden() -> Bool { return true }
 }
 
 extension GameViewController: SCNSceneRendererDelegate {
@@ -236,8 +273,9 @@ extension GameViewController: SCNSceneRendererDelegate {
 				else if playerDirection == .Left {
 					playerNode.physicsBody?.velocity = SCNVector3(x: -playerVelocityMagnitude, y: 0, z: 0)
 				}
+				updateCameraBasedOnPlayerDirection()
 			}
-			cameraNode.position = playerNode.presentationNode.position
+
 		}
 	}
 }
@@ -248,13 +286,13 @@ extension GameViewController: SCNPhysicsContactDelegate {
 		if gameState == .Play {
 			//playerNode.physicsBody?.velocity = SCNVector3Zero
 			let otherNode: SCNNode!
-		
+			
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player.rawValue { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
-		
+			
 			if otherNode.name == "wall" {
 				//bounce off
-			} else if otherNode.name == "pearl" || otherNode.name == "enemy" { collisionWithNode(otherNode) }
+			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { collisionWithNode(otherNode) }
 		}
 	}
 }
@@ -274,3 +312,4 @@ extension SCNAction {
 		return SCNAction.sequence([wait,runBlock])
 	}
 }
+
