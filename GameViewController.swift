@@ -14,13 +14,6 @@ import Darwin
 import SpriteKit
 import ModelIO
 
-enum PlayerCurrentDirection {
-	case Forward, Backward, Right, Left
-}
-
-enum CameraCurrentDirection {
-	case Forward, Backward, Right, Left
-}
 
 enum PhysicsCategory: Int {
 	case None = 0
@@ -40,29 +33,27 @@ enum GameState {
 
 
 class GameViewController: UIViewController {
-	let pi = CGFloat(M_PI)
-	let stepDistance: Float = 0.5
-	var playerDirection = PlayerCurrentDirection.Forward
-	var playerCameraDirection = PlayerCurrentDirection.Forward
-	var playerMoving = false
-	var playerVelocityMagnitude: Float = 2.0
 	var currentLevel: Int = 0
 	
 	var scnView: SCNView!
 	var levelScene: SCNScene!
+	var floor: SCNNode!
 	var cameraNode: SCNNode!
-	var playerCamera: SCNNode!
-	var playerLight: SCNNode!
-	var playerSpotLight: SCNNode!
+	
+	// to se je treba prestavit?
+	var playerCamera: SCNNode! //camera that follows the player
+	var playerSpotLight: SCNNode! //light that shines on the player
+	//
+	
 	var enemyExplosionParticleSystem: SCNParticleSystem!
 	var pearlExplosionParticleSystem: SCNParticleSystem!
 	
 	var newGameCameraSelfieStickNode: SCNNode!
 	var newGameCamera: SCNNode!
 	
-	var playerNode: SCNNode!
+	var playerNode: SCNNode! //parent of player and playerSpotLight
+	var playerClass: Player!
 	var player: SCNNode!
-	var floor: SCNNode!
 	
 	//HUD
 	var skHUDScene: SKScene!
@@ -107,14 +98,8 @@ class GameViewController: UIViewController {
 	
 	func setupNodes() {
 		// player
-		playerNode = levelScene.rootNode.childNodeWithName("playerNode", recursively: true)!
-		player = levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
-		playerNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: SCNPhysicsShape(geometry:SCNSphere(radius: 0.15), options: nil))
-		playerNode.physicsBody?.affectedByGravity = false
-		playerNode.physicsBody?.categoryBitMask = PhysicsCategory.Player.rawValue
-		playerNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Floor.rawValue
-		playerNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Pearl.rawValue | PhysicsCategory.Enemy.rawValue
-		
+		playerClass = Player(viewController: self, scene: levelScene)
+		player = playerClass.scnNode
 		
 		levelScene.rootNode.enumerateChildNodesUsingBlock { node, stop in
 			if node.name == "wallObject reference" {
@@ -156,11 +141,10 @@ class GameViewController: UIViewController {
 		// camera and lights
 		cameraNode = levelScene.rootNode.childNodeWithName("cameraNode", recursively: true)!
 		playerCamera = levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
-		playerLight = levelScene.rootNode.childNodeWithName("playerLight", recursively: true)!
 		playerSpotLight = levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
 		
-		playerCamera.constraints = [SCNLookAtConstraint(target: playerNode.presentationNode)]
-		playerSpotLight.constraints = [SCNLookAtConstraint(target: playerNode.presentationNode)]
+		playerCamera.constraints = [SCNLookAtConstraint(target: player.presentationNode)]
+		playerSpotLight.constraints = [SCNLookAtConstraint(target: player.presentationNode)]
 		
 		newGameCamera = levelScene.rootNode.childNodeWithName("newGameCamera", recursively: true)!
 		newGameCameraSelfieStickNode = levelScene.rootNode.childNodeWithName("newGameCameraSelfieStick", recursively: true)!
@@ -182,44 +166,13 @@ class GameViewController: UIViewController {
 		//level1Scene.paused = true
 	}
 	
-	func createExplosion(explosion: SCNParticleSystem, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
-		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
-		explosion.emitterShape = geometry
-		
-		levelScene.addParticleSystem(explosion, withTransform: translationMatrix)
-	}
-	
-	func collisionWithNode(node: SCNNode) {
-		let geometry = node.name == "pearl" ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
-		let position = node.presentationNode.position
-		let explosion = node.name == "pearl" ? pearlExplosionParticleSystem : enemyExplosionParticleSystem
-		node.runAction(SCNAction.fadeOutWithDuration(0.1))
-		createExplosion(explosion, withGeometry: geometry, atPosition: position)
-		
-		node.hidden = true
-		node.runAction(SCNAction.waitForDurationThenRunBlock(6.0) { node in node.hidden = false })
-		
-		if node.name == "pearl" {
-			// + points?
-		} else if node.name == "enemy" {
-			//gameOver()
-		}
-	}
-	
 	func updateCameraBasedOnPlayerDirection() {
-		cameraNode.position = playerNode.presentationNode.position
+		cameraNode.position = player.presentationNode.position
 		
 		//if player changed direction, we have to rotate the cameraNode (a selfie stick for playerCamera)
-		let playerChangedDirection = playerCameraDirection == playerDirection
-		if playerChangedDirection {
-			let rotateAction: SCNAction!
-		
-			switch playerCameraDirection {
-			case .Forward: rotateAction = SCNAction.rotateToX(0, y: 0, z: 0, duration: 0.1, shortestUnitArc: true)
-			case .Backward: rotateAction = SCNAction.rotateToX(0, y: pi, z: 0, duration: 0.1, shortestUnitArc: true)
-			case .Right: rotateAction = SCNAction.rotateToX(0, y: -pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
-			case .Left: rotateAction = SCNAction.rotateToX(0, y: pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
-			}
+		let playerDirectionUnchanged = playerClass.cameraDirection == playerClass.cameraDirection
+		if !playerDirectionUnchanged {
+			let rotateAction = playerClass.updateCameraDirection()
 			cameraNode.runAction(rotateAction)
 		}
 	}
@@ -234,20 +187,21 @@ class GameViewController: UIViewController {
 			newGame()
 		case .Play:
 			for touch in touches {
-				playerMoving = true
-				if touch.locationInView(scnView).y > scnView.center.y + 50.0 { playerDirection = .Forward }
-				else if touch.locationInView(scnView).y < scnView.center.y - 50.0 { playerDirection = .Backward }
-				else if touch.locationInView(scnView).x > scnView.center.x + 20.0 { playerDirection = .Right }
-				else if touch.locationInView(scnView).x < scnView.center.x - 20.0 { playerDirection = .Left }
-				else {playerMoving = false}
+				playerClass.moving = true
+				if touch.locationInView(scnView).y > scnView.center.y + 50.0 { playerClass.direction = .Forward }
+				else if touch.locationInView(scnView).y < scnView.center.y - 50.0 { playerClass.direction = .Backward }
+				else if touch.locationInView(scnView).x > scnView.center.x + 20.0 { playerClass.direction = .Right }
+				else if touch.locationInView(scnView).x < scnView.center.x - 20.0 { playerClass.direction = .Left }
+				else {playerClass.moving = false}
 			}
 		case .GameOver: switchToTapToPlayScene()
 		}
 	}
 	
 	override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		playerMoving = false
-		playerNode.physicsBody?.velocity = SCNVector3Zero
+		playerClass.moving = false
+		player.physicsBody?.velocity = SCNVector3Zero
+		player.physicsBody?.angularVelocity = SCNVector4Zero
 	}
 	
 	override func shouldAutorotate() -> Bool { return true }
@@ -260,22 +214,10 @@ extension GameViewController: SCNSceneRendererDelegate {
 	func renderer(renderer: SCNSceneRenderer, updateAtTime time: NSTimeInterval) {
 		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.01 }
 		if gameState == .Play {
-			if playerMoving {
-				if playerDirection == .Forward {
-					playerNode.physicsBody?.velocity = SCNVector3(x: 0, y: 0, z: playerVelocityMagnitude)
-				}
-				else if playerDirection == .Backward {
-					playerNode.physicsBody?.velocity = SCNVector3(x: 0, y: 0, z: -playerVelocityMagnitude)
-				}
-				else if playerDirection == .Right {
-					playerNode.physicsBody?.velocity = SCNVector3(x: playerVelocityMagnitude, y: 0, z: 0)
-				}
-				else if playerDirection == .Left {
-					playerNode.physicsBody?.velocity = SCNVector3(x: -playerVelocityMagnitude, y: 0, z: 0)
-				}
+			if playerClass.moving {
+				playerClass.playerRoll()
 				updateCameraBasedOnPlayerDirection()
 			}
-
 		}
 	}
 }
@@ -292,24 +234,8 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			
 			if otherNode.name == "wall" {
 				//bounce off
-			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { collisionWithNode(otherNode) }
+			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { playerClass.collisionWithNode(otherNode) }
 		}
-	}
-}
-
-extension SCNAction {
-	class func waitForDurationThenRemoveFromParent(duration:NSTimeInterval) -> SCNAction {
-		let wait = SCNAction.waitForDuration(duration)
-		let remove = SCNAction.removeFromParentNode()
-		return SCNAction.sequence([wait,remove])
-	}
-	
-	class func waitForDurationThenRunBlock(duration:NSTimeInterval, block: ((SCNNode!) -> Void) ) -> SCNAction {
-		let wait = SCNAction.waitForDuration(duration)
-		let runBlock = SCNAction.runBlock { (node) -> Void in
-			block(node)
-		}
-		return SCNAction.sequence([wait,runBlock])
 	}
 }
 
