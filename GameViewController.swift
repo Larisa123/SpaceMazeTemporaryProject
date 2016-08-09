@@ -78,7 +78,7 @@ class GameViewController: UIViewController {
 	}
 	
 	func setupScene() {
-		levelScene = sceneBasedOnLevel(1)!
+		levelScene = sceneBasedOnLevel(2)!
 		scnView.scene = levelScene
 		
 		levelScene.physicsWorld.contactDelegate = self

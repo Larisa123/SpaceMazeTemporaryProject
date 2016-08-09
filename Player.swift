@@ -26,7 +26,7 @@ class Player {
 	var scnNode: SCNNode!
 	var direction: PlayerCurrentDirection = .Forward
 	var cameraDirection: CameraCurrentDirection = .Forward
-	var velocityMagnitude: Float = 2.0
+	var velocityMagnitude: Float = 3.0
 	//var light: SCNNode!
 	
 	var moving = false
@@ -49,11 +49,10 @@ class Player {
 		let geometry = node.name == "pearl" ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
 		let position = node.presentationNode.position
 		let explosion = node.name == "pearl" ? gameViewController.pearlExplosionParticleSystem : gameViewController.enemyExplosionParticleSystem
-		node.runAction(SCNAction.fadeOutWithDuration(0.1))
 		createExplosion(explosion, withGeometry: geometry, atPosition: position)
 		
-		node.hidden = true
-		node.runAction(SCNAction.waitForDurationThenRunBlock(6.0) { node in node.hidden = false })
+		node.runAction(SCNAction.waitForDurationThenRunBlock(0.1) { node in node.hidden = true })
+		node.runAction(SCNAction.waitForDurationThenRunBlock(10.0) { node in node.hidden = false })
 		
 		if node.name == "pearl" {
 			// + points?
