@@ -47,8 +47,8 @@ class Player {
 		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Floor.rawValue
 		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Pearl.rawValue | PhysicsCategory.Enemy.rawValue
 		
-		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.7, duration: 0.1)
-		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.1)
+		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.3, duration: 0.15)
+		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.15)
 		fadeAndIncreaseOpacityAction = SCNAction.sequence([fadeOpacityAction, increaseOpacityAction])
 	}
 	
@@ -112,6 +112,7 @@ class Player {
 	
 	func animateTransparency() {
 		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 2))
+		print("Animated transparency")
 	}
 	
 	required init?(coder aDecoder: NSCoder) {

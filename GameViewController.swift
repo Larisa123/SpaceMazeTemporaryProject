@@ -47,6 +47,8 @@ class GameViewController: UIViewController {
 	
 	var enemyExplosionParticleSystem: SCNParticleSystem!
 	var pearlExplosionParticleSystem: SCNParticleSystem!
+	var pearlParticleSystem: SCNParticleSystem!
+	var starsParticleSystem: SCNParticleSystem!
 	
 	var newGameCameraSelfieStickNode: SCNNode!
 	var newGameCamera: SCNNode!
@@ -54,6 +56,7 @@ class GameViewController: UIViewController {
 	var playerNode: SCNNode! //parent of player and playerSpotLight
 	var playerClass: Player!
 	var player: SCNNode!
+	var winningPearl: SCNNode!
 	
 	//HUD
 	//var skHUDScene: SKScene!
@@ -61,6 +64,7 @@ class GameViewController: UIViewController {
 	
 	//gameplay variables
 	var gameState = GameState.TapToPlay
+	var sounds: [String:SCNAudioSource] = [:]
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
@@ -69,6 +73,7 @@ class GameViewController: UIViewController {
 		setupSceneLevel(2)
 		setupHUD()
 		setupNodes()
+		setupSounds()
 		setupRotatingCamera()
 	}
 	
@@ -131,11 +136,22 @@ class GameViewController: UIViewController {
 		floor.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
 		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor.rawValue
 		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player.rawValue
-		
+	
 		
 		//particle systems:
-		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets")!
-		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets")!
+		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		pearlParticleSystem = SCNParticleSystem(named: "pearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		starsParticleSystem = SCNParticleSystem(named: "starsParticleSystem.scnp", inDirectory: "art.scnassets/Particles/starsParticleSystem.scnp")
+		
+		//winning pearl
+		winningPearl = levelScene.rootNode.childNodeWithName("winningPearl reference", recursively: true)!
+		winningPearl.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
+		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl.rawValue
+		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
+		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+		winningPearl.name = "winningPearl"
+		winningPearl.addParticleSystem(pearlParticleSystem)
 		
 		
 		// camera and lights
@@ -163,7 +179,8 @@ class GameViewController: UIViewController {
 	
 	func setupRotatingCamera() {
 		scnView.pointOfView = newGameCamera
-		//level1Scene.paused = true
+
+		//floor.addParticleSystem(starsParticleSystem)
 	}
 	
 	func updateCameraBasedOnPlayerDirection() {
@@ -207,6 +224,22 @@ class GameViewController: UIViewController {
 	override func shouldAutorotate() -> Bool { return true }
 	
 	override func prefersStatusBarHidden() -> Bool { return true }
+	
+	func loadSound(name:String, fileNamed:String) {
+		let sound = SCNAudioSource(fileNamed: fileNamed)!
+		sound.load()
+		sounds[name] = sound
+	}
+	
+	func playSound(node:SCNNode, name:String) {
+		let sound = sounds[name]
+		node.runAction(SCNAction.playAudioSource(sound!, waitForCompletion: false))
+	}
+	
+	func setupSounds() {
+		loadSound("wallCrash", fileNamed: "art.scnassets/Sounds/projectileHit.flac")
+
+	}
 }
 
 extension GameViewController: SCNSceneRendererDelegate {
@@ -226,14 +259,13 @@ extension GameViewController: SCNPhysicsContactDelegate {
 	
 	func physicsWorld(world: SCNPhysicsWorld, didBeginContact contact: SCNPhysicsContact) {
 		if gameState == .Play {
-			//playerNode.physicsBody?.velocity = SCNVector3Zero
 			let otherNode: SCNNode!
 			
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player.rawValue { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
 			if otherNode.name == "wall" {
-				//bounce off
+				playSound(otherNode, name: "wallCrash")
 			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { playerClass.collisionWithNode(otherNode) }
 			//if otherNode.name == "pearl" { setupSceneLevel(1) }
 		}
