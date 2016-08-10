@@ -26,7 +26,7 @@ class Player {
 	var scnNode: SCNNode!
 	var direction: PlayerCurrentDirection = .Forward
 	var cameraDirection: CameraCurrentDirection = .Forward
-	var velocityMagnitude: Float = 3.0
+	var velocityMagnitude: Float = 1.0
 	//var light: SCNNode!
 	
 	var moving = false
@@ -51,7 +51,7 @@ class Player {
 		let explosion = node.name == "pearl" ? gameViewController.pearlExplosionParticleSystem : gameViewController.enemyExplosionParticleSystem
 		createExplosion(explosion, withGeometry: geometry, atPosition: position)
 		
-		node.runAction(SCNAction.waitForDurationThenRunBlock(0.1) { node in node.hidden = true })
+		node.hidden = true
 		node.runAction(SCNAction.waitForDurationThenRunBlock(10.0) { node in node.hidden = false })
 		
 		if node.name == "pearl" {

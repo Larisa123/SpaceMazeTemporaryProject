@@ -212,7 +212,7 @@ class GameViewController: UIViewController {
 extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(renderer: SCNSceneRenderer, updateAtTime time: NSTimeInterval) {
-		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.01 }
+		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.001 }
 		if gameState == .Play {
 			if playerClass.moving {
 				playerClass.playerRoll()
