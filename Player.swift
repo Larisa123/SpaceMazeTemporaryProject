@@ -27,6 +27,7 @@ class Player {
 	var direction: PlayerCurrentDirection = .Forward
 	var cameraDirection: CameraCurrentDirection = .Forward
 	var velocityMagnitude: Float = 1.0
+	var fadeAndIncreaseOpacityAction: SCNAction!
 	//var light: SCNNode!
 	
 	var moving = false
@@ -40,9 +41,15 @@ class Player {
 		self.scnNode = levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
 		scnNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: shape)
 		scnNode.physicsBody?.affectedByGravity = true
+		//scnNode.physicsBody?.velocityFactor = SCNVector3(1, 0, 1)
+		//scnNode.physicsBody?.velocity = SCNVector3Zero
 		scnNode.physicsBody?.categoryBitMask = PhysicsCategory.Player.rawValue
 		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Floor.rawValue
 		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Pearl.rawValue | PhysicsCategory.Enemy.rawValue
+		
+		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.7, duration: 0.1)
+		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.1)
+		fadeAndIncreaseOpacityAction = SCNAction.sequence([fadeOpacityAction, increaseOpacityAction])
 	}
 	
 	func collisionWithNode(node: SCNNode) {
@@ -57,7 +64,7 @@ class Player {
 		if node.name == "pearl" {
 			// + points?
 		} else if node.name == "enemy" {
-			//gameOver()
+			crashedWithEnemy()
 		}
 	}
 	
@@ -97,6 +104,14 @@ class Player {
 		case .Left: rotateAction = SCNAction.rotateToX(0, y: pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
 		}
 		return rotateAction
+	}
+	
+	func crashedWithEnemy() {
+		animateTransparency()
+	}
+	
+	func animateTransparency() {
+		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 2))
 	}
 	
 	required init?(coder aDecoder: NSCoder) {

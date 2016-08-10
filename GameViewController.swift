@@ -56,7 +56,7 @@ class GameViewController: UIViewController {
 	var player: SCNNode!
 	
 	//HUD
-	var skHUDScene: SKScene!
+	//var skHUDScene: SKScene!
 	//var directionsNode: SKLabelNode!
 	
 	//gameplay variables
@@ -66,7 +66,7 @@ class GameViewController: UIViewController {
 		super.viewDidLoad()
 		
 		setupView()
-		setupScene()
+		setupSceneLevel(2)
 		setupHUD()
 		setupNodes()
 		setupRotatingCamera()
@@ -77,8 +77,8 @@ class GameViewController: UIViewController {
 		scnView.delegate = self
 	}
 	
-	func setupScene() {
-		levelScene = sceneBasedOnLevel(2)!
+	func setupSceneLevel(level: Int) {
+		levelScene = sceneBasedOnLevel(level)!
 		scnView.scene = levelScene
 		
 		levelScene.physicsWorld.contactDelegate = self
@@ -91,7 +91,7 @@ class GameViewController: UIViewController {
 	}
 	
 	func setupHUD() {
-		skHUDScene = SKScene(fileNamed: "art.scnassets/displaySKScene.sks")
+		//skHUDScene = SKScene(fileNamed: "art.scnassets/displaySKScene.sks")
 		
 		//scnView.overlaySKScene = skHUDScene
 	}
@@ -212,7 +212,7 @@ class GameViewController: UIViewController {
 extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(renderer: SCNSceneRenderer, updateAtTime time: NSTimeInterval) {
-		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.001 }
+		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
 		if gameState == .Play {
 			if playerClass.moving {
 				playerClass.playerRoll()
@@ -235,6 +235,7 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			if otherNode.name == "wall" {
 				//bounce off
 			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { playerClass.collisionWithNode(otherNode) }
+			//if otherNode.name == "pearl" { setupSceneLevel(1) }
 		}
 	}
 }
