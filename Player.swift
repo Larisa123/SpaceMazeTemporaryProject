@@ -30,6 +30,9 @@ class Player {
 	var fadeAndIncreaseOpacityAction: SCNAction!
 	//var light: SCNNode!
 	
+	var camera: SCNNode! //camera that follows the player
+	var spotLight: SCNNode! //light that shines on the player
+	
 	var moving = false
 	
 	init(viewController: GameViewController, scene: SCNScene) {
@@ -43,36 +46,19 @@ class Player {
 		scnNode.physicsBody?.affectedByGravity = true
 		//scnNode.physicsBody?.velocityFactor = SCNVector3(1, 0, 1)
 		//scnNode.physicsBody?.velocity = SCNVector3Zero
-		scnNode.physicsBody?.categoryBitMask = PhysicsCategory.Player.rawValue
-		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Floor.rawValue
-		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall.rawValue | PhysicsCategory.Pearl.rawValue | PhysicsCategory.Enemy.rawValue
+		scnNode.physicsBody?.categoryBitMask = PhysicsCategory.Player
+		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall | PhysicsCategory.Floor
+		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall | PhysicsCategory.Pearl | PhysicsCategory.Enemy
 		
-		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.3, duration: 0.15)
-		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.15)
+		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.2, duration: 0.3)
+		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.3)
 		fadeAndIncreaseOpacityAction = SCNAction.sequence([fadeOpacityAction, increaseOpacityAction])
-	}
-	
-	func collisionWithNode(node: SCNNode) {
-		let geometry = node.name == "pearl" ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
-		let position = node.presentationNode.position
-		let explosion = node.name == "pearl" ? gameViewController.pearlExplosionParticleSystem : gameViewController.enemyExplosionParticleSystem
-		createExplosion(explosion, withGeometry: geometry, atPosition: position)
 		
-		node.hidden = true
-		node.runAction(SCNAction.waitForDurationThenRunBlock(10.0) { node in node.hidden = false })
+		camera = levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
+		spotLight = levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
 		
-		if node.name == "pearl" {
-			// + points?
-		} else if node.name == "enemy" {
-			crashedWithEnemy()
-		}
-	}
-	
-	func createExplosion(explosion: SCNParticleSystem, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
-		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
-		explosion.emitterShape = geometry
-		
-		levelScene.addParticleSystem(explosion, withTransform: translationMatrix)
+		camera.constraints = [SCNLookAtConstraint(target: self.scnNode.presentationNode)]
+		spotLight.constraints = [SCNLookAtConstraint(target: self.scnNode.presentationNode)]
 	}
 	
 	func playerRoll() {
@@ -94,6 +80,8 @@ class Player {
 		}
 	}
 	
+	
+	// doesn't work!
 	func updateCameraDirection() -> SCNAction {
 		let rotateAction: SCNAction!
 		
@@ -106,13 +94,8 @@ class Player {
 		return rotateAction
 	}
 	
-	func crashedWithEnemy() {
-		animateTransparency()
-	}
-	
 	func animateTransparency() {
-		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 2))
-		print("Animated transparency")
+		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 3))
 	}
 	
 	required init?(coder aDecoder: NSCoder) {

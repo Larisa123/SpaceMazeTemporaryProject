@@ -12,23 +12,15 @@ import UIKit
 import SceneKit
 import Darwin
 import SpriteKit
-import ModelIO
 
-
-enum PhysicsCategory: Int {
-	case None = 0
-	case Player = 0b1 //1
-	case Wall = 0b10 //2
-	case Pearl = 0b100 //4
-	case WinningPearl = 0b1000
-	case Floor = 0b10000
-	case Enemy = 0b100000
-}
-
-enum GameState {
-	case TapToPlay
-	case Play
-	case GameOver
+struct PhysicsCategory {
+	static let None: Int = 0
+	static let Player: Int = 0b1
+	static let Wall: Int = 0b10
+	static let Pearl: Int = 0b100
+	static let WinningPearl: Int = 0b1000
+	static let Floor: Int = 0b10000
+	static let Enemy: Int = 0b10000
 }
 
 
@@ -38,20 +30,13 @@ class GameViewController: UIViewController {
 	var scnView: SCNView!
 	var levelScene: SCNScene!
 	var floor: SCNNode!
-	var cameraNode: SCNNode!
-	
-	// to se je treba prestavit?
-	var playerCamera: SCNNode! //camera that follows the player
-	var playerSpotLight: SCNNode! //light that shines on the player
-	//
 	
 	var enemyExplosionParticleSystem: SCNParticleSystem!
+	var enemyParticleSystem: SCNParticleSystem!
 	var pearlExplosionParticleSystem: SCNParticleSystem!
+	var smallPearlParticleSystem: SCNParticleSystem!
 	var pearlParticleSystem: SCNParticleSystem!
 	var starsParticleSystem: SCNParticleSystem!
-	
-	var newGameCameraSelfieStickNode: SCNNode!
-	var newGameCamera: SCNNode!
 	
 	var playerNode: SCNNode! //parent of player and playerSpotLight
 	var playerClass: Player!
@@ -59,22 +44,21 @@ class GameViewController: UIViewController {
 	var winningPearl: SCNNode!
 	
 	//HUD
-	//var skHUDScene: SKScene!
-	//var directionsNode: SKLabelNode!
+	var skHUDScene: SKScene!
+	var hudNode: SCNNode!
 	
-	//gameplay variables
-	var gameState = GameState.TapToPlay
-	var sounds: [String:SCNAudioSource] = [:]
+	var game: Game!
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
 		setupView()
 		setupSceneLevel(2)
-		setupHUD()
 		setupNodes()
-		setupSounds()
-		setupRotatingCamera()
+		game.setupHUD()
+		game.setupSounds()
+		game.setupCamera()
+		game.setupRotatingCamera()
 	}
 	
 	func setupView() {
@@ -95,180 +79,120 @@ class GameViewController: UIViewController {
 		return scene
 	}
 	
-	func setupHUD() {
-		//skHUDScene = SKScene(fileNamed: "art.scnassets/displaySKScene.sks")
-		
-		//scnView.overlaySKScene = skHUDScene
-	}
-	
 	func setupNodes() {
 		// player
 		playerClass = Player(viewController: self, scene: levelScene)
 		player = playerClass.scnNode
 		
+		//HUD
+		game = Game(scnView: scnView, levelScene: levelScene, gameViewController: self)
+		skHUDScene = game.HUDScene
+		let hudSceneTemporary = hudSKSScene(size: CGSizeZero, scnView: scnView, levelScene: levelScene, game: game)
+		scnView.overlaySKScene = hudSceneTemporary
+		
+		//particle systems:
+		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		enemyParticleSystem = SCNParticleSystem(named: "enemyParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		pearlParticleSystem = SCNParticleSystem(named: "pearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		smallPearlParticleSystem = SCNParticleSystem(named: "smallPearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")! //change the texture?
+		starsParticleSystem = SCNParticleSystem(named: "starsParticleSystem.scnp", inDirectory: "art.scnassets/Particles/starsParticleSystem.scnp")
+		
 		levelScene.rootNode.enumerateChildNodesUsingBlock { node, stop in
 			if node.name == "wallObject reference" {
 				node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: SCNPhysicsShape(geometry: SCNBox(width: 0.1, height: 0.5, length: 0.5, chamferRadius: 1.0) , options: nil))
-				node.physicsBody?.categoryBitMask = PhysicsCategory.Wall.rawValue
-				node.physicsBody?.collisionBitMask = PhysicsCategory.Player.rawValue
-				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+				node.physicsBody?.categoryBitMask = PhysicsCategory.Wall
+				node.physicsBody?.collisionBitMask = PhysicsCategory.Player
+				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 				node.name = "wall"
 			}
 			if self.currentLevel > 1 { //level 1 has no pearls or enemys
 				if node.name == "pearl reference" {
 					node.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl.rawValue
-					node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
-					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl
+					node.physicsBody?.collisionBitMask = PhysicsCategory.None
+					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 					node.name = "pearl"
+					node.addParticleSystem(self.smallPearlParticleSystem)
 				}
 				if node.name == "enemy reference" {
 					node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: nil)
-					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy.rawValue
-					node.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
-					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy
+					node.physicsBody?.collisionBitMask = PhysicsCategory.None
+					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 					node.name = "enemy"
+					node.addParticleSystem(self.enemyParticleSystem)
 				}
 			}
 		}
 		
 		floor = levelScene.rootNode.childNodeWithName("floorObject reference", recursively: true)!
 		floor.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor.rawValue
-		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player.rawValue
+		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor
+		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player
 	
-		
-		//particle systems:
-		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
-		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
-		pearlParticleSystem = SCNParticleSystem(named: "pearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
-		starsParticleSystem = SCNParticleSystem(named: "starsParticleSystem.scnp", inDirectory: "art.scnassets/Particles/starsParticleSystem.scnp")
 		
 		//winning pearl
 		winningPearl = levelScene.rootNode.childNodeWithName("winningPearl reference", recursively: true)!
 		winningPearl.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl.rawValue
-		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None.rawValue
-		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player.rawValue
+		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
+		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None
+		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 		winningPearl.name = "winningPearl"
 		winningPearl.addParticleSystem(pearlParticleSystem)
+	}
+	
+	
+	func setupHUD() {
+		let plane = SCNPlane(width: 1000, height: 500)
+		let material = SCNMaterial()
+		material.lightingModelName = SCNLightingModelConstant
+		material.doubleSided = true
+		material.diffuse.contents = skHUDScene
+		plane.materials = [material]
 		
-		
-		// camera and lights
-		cameraNode = levelScene.rootNode.childNodeWithName("cameraNode", recursively: true)!
-		playerCamera = levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
-		playerSpotLight = levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
-		
-		playerCamera.constraints = [SCNLookAtConstraint(target: player.presentationNode)]
-		playerSpotLight.constraints = [SCNLookAtConstraint(target: player.presentationNode)]
-		
-		newGameCamera = levelScene.rootNode.childNodeWithName("newGameCamera", recursively: true)!
-		newGameCameraSelfieStickNode = levelScene.rootNode.childNodeWithName("newGameCameraSelfieStick", recursively: true)!
-		newGameCamera.constraints = [SCNLookAtConstraint(target: floor)]
-	}
+		hudNode = SCNNode(geometry: plane)
+		hudNode.name = "HUD"
+		hudNode.rotation = SCNVector4(x: 1, y: 0, z: 0, w: 3.14159265)
 	
-	func newGame() {
-		scnView.pointOfView = playerCamera
-		gameState = .Play
-	}
-	
-	func switchToTapToPlayScene() {
-		gameState = .TapToPlay
-		setupRotatingCamera()
-	}
-	
-	func setupRotatingCamera() {
-		scnView.pointOfView = newGameCamera
-
-		//floor.addParticleSystem(starsParticleSystem)
-	}
-	
-	func updateCameraBasedOnPlayerDirection() {
-		cameraNode.position = player.presentationNode.position
-		
-		//if player changed direction, we have to rotate the cameraNode (a selfie stick for playerCamera)
-		let playerDirectionUnchanged = playerClass.cameraDirection == playerClass.cameraDirection
-		if !playerDirectionUnchanged {
-			let rotateAction = playerClass.updateCameraDirection()
-			cameraNode.runAction(rotateAction)
-		}
-	}
-	
-	func gameOver() {
-		gameState = .GameOver
-	}
-	
-	override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		switch gameState {
-		case .TapToPlay:
-			newGame()
-		case .Play:
-			for touch in touches {
-				playerClass.moving = true
-				if touch.locationInView(scnView).y > scnView.center.y + 50.0 { playerClass.direction = .Forward }
-				else if touch.locationInView(scnView).y < scnView.center.y - 50.0 { playerClass.direction = .Backward }
-				else if touch.locationInView(scnView).x > scnView.center.x + 20.0 { playerClass.direction = .Right }
-				else if touch.locationInView(scnView).x < scnView.center.x - 20.0 { playerClass.direction = .Left }
-				else {playerClass.moving = false}
-			}
-		case .GameOver: switchToTapToPlayScene()
-		}
-	}
-	
-	override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		playerClass.moving = false
-		player.physicsBody?.velocity = SCNVector3Zero
-		player.physicsBody?.angularVelocity = SCNVector4Zero
+		game.newGameCamera.addChildNode(SCNNode(geometry: plane))
 	}
 	
 	override func shouldAutorotate() -> Bool { return true }
 	
 	override func prefersStatusBarHidden() -> Bool { return true }
 	
-	func loadSound(name:String, fileNamed:String) {
-		let sound = SCNAudioSource(fileNamed: fileNamed)!
-		sound.load()
-		sounds[name] = sound
-	}
 	
-	func playSound(node:SCNNode, name:String) {
-		let sound = sounds[name]
-		node.runAction(SCNAction.playAudioSource(sound!, waitForCompletion: false))
-	}
-	
-	func setupSounds() {
-		loadSound("wallCrash", fileNamed: "art.scnassets/Sounds/projectileHit.flac")
-
-	}
 }
 
 extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(renderer: SCNSceneRenderer, updateAtTime time: NSTimeInterval) {
-		if gameState == .TapToPlay {newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
-		if gameState == .Play {
+		if game.state == .TapToPlay { game.newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
+		if game.state == .Play {
 			if playerClass.moving {
 				playerClass.playerRoll()
-				updateCameraBasedOnPlayerDirection()
+				game.updateCameraBasedOnPlayerDirection()
 			}
 		}
 	}
 }
 
 extension GameViewController: SCNPhysicsContactDelegate {
-	
+
 	func physicsWorld(world: SCNPhysicsWorld, didBeginContact contact: SCNPhysicsContact) {
-		if gameState == .Play {
+		if game.state == .Play {
 			let otherNode: SCNNode!
 			
-			if contact.nodeA.categoryBitMask == PhysicsCategory.Player.rawValue { otherNode = contact.nodeB }
+			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
 			if otherNode.name == "wall" {
-				playSound(otherNode, name: "wallCrash")
-			} else if currentLevel > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { playerClass.collisionWithNode(otherNode) }
+				game.playSound(otherNode, name: "wallCrash")
+			} else if game.level > 1 && (otherNode.name == "pearl" || otherNode.name == "enemy") { game.collisionWithNode(otherNode) }
 			//if otherNode.name == "pearl" { setupSceneLevel(1) }
 		}
 	}
 }
+
 
