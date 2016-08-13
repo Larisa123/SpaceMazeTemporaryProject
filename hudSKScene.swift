@@ -12,19 +12,11 @@ import SceneKit
 class hudSKSScene: SKScene {
 	var controller: SKSpriteNode!
 	var controllerRadius: CGFloat!
-	var game: Game!
-	var scnView: SCNView!
-	var levelScene: SCNScene!
-	var player: SCNNode!
+	var gameViewController: GameViewController!
 	
-	init(size: CGSize, scnView: SCNView, levelScene: SCNScene, game: Game) {
-		super.init(size: size)
-		
-		self.game = game
-
-		self.scnView = scnView
-		self.levelScene = levelScene
-
+	init(gameViewController: GameViewController) {
+		super.init(size: CGSizeMake(600, 300))
+		self.gameViewController = gameViewController
 		
 		//setup the overlay scene
 		self.backgroundColor = UIColor.redColor()
@@ -52,24 +44,39 @@ class hudSKSScene: SKScene {
 	}
 	
 	override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		switch game.state {
-		case .TapToPlay:
-			game.newGame()
+		switch gameViewController.game.state {
+		case .TapToPlay: gameViewController.game.startTheGame()
 		case .Play:
 			for touch in touches {
-				game.playerClass.moving = true
-				if touch.locationInView(scnView).y > scnView.center.y + 50.0 { game.playerClass.direction = .Forward }
-				else if touch.locationInView(scnView).y < scnView.center.y - 50.0 { game.playerClass.direction = .Backward }
-				else if touch.locationInView(scnView).x > scnView.center.x + 20.0 { game.playerClass.direction = .Right }
-				else if touch.locationInView(scnView).x < scnView.center.x - 20.0 { game.playerClass.direction = .Left }
-				else { game.playerClass.moving = false }
+				let touchLocationInView = touch.locationInView(gameViewController.scnView)
+				gameViewController.playerClass.moving = true
+				
+				if touchLocationInView.y > gameViewController.scnView.center.y + 50.0 {
+					gameViewController.playerClass.direction = .Forward
+				}
+				else if touchLocationInView.y < gameViewController.scnView.center.y - 50.0 {
+					gameViewController.playerClass.direction = .Backward
+				}
+				else if touchLocationInView.x > gameViewController.scnView.center.x + 20.0 {
+					gameViewController.playerClass.direction = .Right
+				}
+				else if touchLocationInView.x < gameViewController.scnView.center.x - 20.0 {
+					gameViewController.playerClass.direction = .Left
+				}
+				else { gameViewController.playerClass.moving = false }
 			}
-		case .GameOver: game.switchToTapToPlayScene()
+			if gameViewController.playerClass.moving {
+				gameViewController.playerClass.playerRoll()
+				//playerClass.updateCameraBasedOnPlayerDirection()
+			}
+		case .GameOver: gameViewController.game.switchToTapToPlayScene()
 		}
 	}
 	
 	override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		if game.state == GameState.Play { game.playerClass.stopThePlayer() }
+		if gameViewController.game.state == GameState.Play {
+			gameViewController.playerClass.stopThePlayer()
+		}
 	}
 	
 	required init?(coder aDecoder: NSCoder) {

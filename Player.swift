@@ -22,11 +22,10 @@ let pi = CGFloat(M_PI)
 
 class Player {
 	var gameViewController: GameViewController!
-	var levelScene: SCNScene!
 	var scnNode: SCNNode!
 	var direction: PlayerCurrentDirection = .Forward
 	var cameraDirection: CameraCurrentDirection = .Forward
-	var velocityMagnitude: Float = 1.0
+	var velocityMagnitude: Float = 2.0
 	var fadeAndIncreaseOpacityAction: SCNAction!
 	//var light: SCNNode!
 	
@@ -35,13 +34,12 @@ class Player {
 	
 	var moving = false
 	
-	init(viewController: GameViewController, scene: SCNScene) {
+	init(viewController: GameViewController) {
 		let shape = SCNPhysicsShape(geometry: SCNSphere(radius: 0.15), options: nil)
-		levelScene = scene
-		gameViewController = viewController
+		self.gameViewController = viewController
 		//light = levelScene.rootNode.childNodeWithName("playerLight reference", recursively: true)!
 		
-		self.scnNode = levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
+		self.scnNode = gameViewController.levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
 		scnNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: shape)
 		scnNode.physicsBody?.affectedByGravity = true
 		//scnNode.physicsBody?.velocityFactor = SCNVector3(1, 0, 1)
@@ -54,11 +52,23 @@ class Player {
 		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.3)
 		fadeAndIncreaseOpacityAction = SCNAction.sequence([fadeOpacityAction, increaseOpacityAction])
 		
-		camera = levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
-		spotLight = levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
+		camera = gameViewController.levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
+		spotLight = gameViewController.levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
 		
 		camera.constraints = [SCNLookAtConstraint(target: self.scnNode.presentationNode)]
 		spotLight.constraints = [SCNLookAtConstraint(target: self.scnNode.presentationNode)]
+	}
+	
+	//Player animation:
+	
+	func animateTransparency() {
+		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 3))
+	}
+	
+	func stopThePlayer() {
+		moving = false
+		scnNode.physicsBody?.velocity = SCNVector3Zero
+		scnNode.physicsBody?.angularVelocity = SCNVector4Zero
 	}
 	
 	func playerRoll() {
@@ -80,9 +90,24 @@ class Player {
 		}
 	}
 	
+	func removeThePlayer() {
+		scnNode.removeAllActions()
+		scnNode.removeFromParentNode()
+	}
 	
-	// doesn't work!
-	func updateCameraDirection() -> SCNAction {
+	//camera:
+	
+	func updateCameraBasedOnPlayerDirection() {
+		camera.position = scnNode.presentationNode.position
+		
+		//if player changed direction, we have to rotate the cameraNode (a selfie stick for playerCamera)
+		let playerDirectionUnchanged = cameraDirection == cameraDirection
+		if !playerDirectionUnchanged {
+			//updateCameraDirection()
+		}
+	}
+	
+	func updateCameraDirection() {
 		let rotateAction: SCNAction!
 		
 		switch cameraDirection {
@@ -91,22 +116,10 @@ class Player {
 		case .Right: rotateAction = SCNAction.rotateToX(0, y: -pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
 		case .Left: rotateAction = SCNAction.rotateToX(0, y: pi/2, z: 0, duration: 0.1, shortestUnitArc: true)
 		}
-		return rotateAction
+		camera.runAction(rotateAction)
 	}
 	
-	func animateTransparency() {
-		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 3))
-	}
-	
-	func stopThePlayer() {
-		moving = false
-		scnNode.physicsBody?.velocity = SCNVector3Zero
-		scnNode.physicsBody?.angularVelocity = SCNVector4Zero
-	}
-	
-	required init?(coder aDecoder: NSCoder) {
-		fatalError("init(coder:) has not been implemented")
-	}
+	required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented")}
 }
 
 extension SCNAction {
