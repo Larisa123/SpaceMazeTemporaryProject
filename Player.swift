@@ -25,7 +25,7 @@ class Player {
 	var scnNode: SCNNode!
 	var direction: PlayerCurrentDirection = .Forward
 	var cameraDirection: CameraCurrentDirection = .Forward
-	var velocityMagnitude: Float = 2.0
+	var velocityMagnitude: Float = 1.5
 	var fadeAndIncreaseOpacityAction: SCNAction!
 	//var light: SCNNode!
 	
@@ -35,23 +35,18 @@ class Player {
 	var moving = false
 	
 	init(viewController: GameViewController) {
-		let shape = SCNPhysicsShape(geometry: SCNSphere(radius: 0.15), options: nil)
 		self.gameViewController = viewController
 		//light = levelScene.rootNode.childNodeWithName("playerLight reference", recursively: true)!
 		
-		self.scnNode = gameViewController.levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
-		scnNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: shape)
-		scnNode.physicsBody?.affectedByGravity = true
-		//scnNode.physicsBody?.velocityFactor = SCNVector3(1, 0, 1)
-		//scnNode.physicsBody?.velocity = SCNVector3Zero
-		scnNode.physicsBody?.categoryBitMask = PhysicsCategory.Player
-		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall | PhysicsCategory.Floor
-		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.Wall | PhysicsCategory.Pearl | PhysicsCategory.Enemy
+		setupThePlayer()
+		setupPlayersCamera()
 		
 		let fadeOpacityAction = SCNAction.fadeOpacityTo(0.2, duration: 0.3)
 		let increaseOpacityAction = SCNAction.fadeOpacityTo(1.0, duration: 0.3)
 		fadeAndIncreaseOpacityAction = SCNAction.sequence([fadeOpacityAction, increaseOpacityAction])
-		
+	}
+	
+	func setupPlayersCamera() {
 		camera = gameViewController.levelScene.rootNode.childNodeWithName("playerCamera", recursively: true)!
 		spotLight = gameViewController.levelScene.rootNode.childNodeWithName("playerSpotLight", recursively: true)!
 		
@@ -61,6 +56,16 @@ class Player {
 	
 	//Player animation:
 	
+	func setupThePlayer() {
+		let shape = SCNPhysicsShape(geometry: SCNSphere(radius: 0.15), options: nil)
+		self.scnNode = gameViewController.levelScene.rootNode.childNodeWithName("playerObject reference", recursively: true)!
+		scnNode.physicsBody = SCNPhysicsBody(type: .Dynamic, shape: shape)
+		scnNode.physicsBody?.affectedByGravity = true
+		scnNode.physicsBody?.categoryBitMask = PhysicsCategory.Player
+		scnNode.physicsBody?.collisionBitMask = PhysicsCategory.Wall | PhysicsCategory.Floor
+		scnNode.physicsBody?.contactTestBitMask = PhysicsCategory.WinningPearl | PhysicsCategory.Pearl | PhysicsCategory.Enemy
+	}
+	
 	func animateTransparency() {
 		scnNode.runAction(SCNAction.repeatAction(fadeAndIncreaseOpacityAction, count: 3))
 	}
@@ -69,6 +74,11 @@ class Player {
 		moving = false
 		scnNode.physicsBody?.velocity = SCNVector3Zero
 		scnNode.physicsBody?.angularVelocity = SCNVector4Zero
+	}
+	
+	func reducePlayerVelocity() {
+		let currentVelocity = scnNode.physicsBody!.velocity
+		scnNode.physicsBody?.velocity = SCNVector3Make(-currentVelocity.x / 4, 0 , -currentVelocity.z / 4)
 	}
 	
 	func playerRoll() {
@@ -93,6 +103,10 @@ class Player {
 	func removeThePlayer() {
 		scnNode.removeAllActions()
 		scnNode.removeFromParentNode()
+	}
+	
+	func updateThePlayerInNewScene() {
+		setupThePlayer()
 	}
 	
 	//camera:

@@ -19,7 +19,6 @@ class hudSKSScene: SKScene {
 		self.gameViewController = gameViewController
 		
 		//setup the overlay scene
-		self.backgroundColor = UIColor.redColor()
 		self.anchorPoint = CGPointZero
 		//automatically resize to fill the viewport
 		self.scaleMode = .ResizeFill
@@ -43,9 +42,13 @@ class hudSKSScene: SKScene {
 		self.addChild(controller)
 	}
 	
+	func hideController() { controller.hidden = true }
+	func showController() { controller.hidden = false }
+	
 	override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
 		switch gameViewController.game.state {
-		case .TapToPlay: gameViewController.game.startTheGame()
+		case .TapToPlay:
+			if gameViewController.didNewLevelLoad { gameViewController.game.startTheGame() }
 		case .Play:
 			for touch in touches {
 				let touchLocationInView = touch.locationInView(gameViewController.scnView)
@@ -69,7 +72,8 @@ class hudSKSScene: SKScene {
 				gameViewController.playerClass.playerRoll()
 				//playerClass.updateCameraBasedOnPlayerDirection()
 			}
-		case .GameOver: gameViewController.game.switchToTapToPlayScene()
+		case .GameOver: break
+			//gameViewController.game.switchToTapToPlayScene()
 		}
 	}
 	

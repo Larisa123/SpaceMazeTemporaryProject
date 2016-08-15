@@ -18,14 +18,14 @@ enum GameState {
 
 class Game {
 	var level = 1
-	var score = 0
-	var highScore = 0
+	//var score = 0
+	//var highScore = 0
 	var lives:Int = 10
 	var state: GameState = .TapToPlay
 	
-	var HUDScene: SKScene!
-	var controller: SKSpriteNode!
-	var controllerRadius: CGFloat!
+	//var HUDScene: SKScene!
+	//var controller: SKSpriteNode!
+	//var controllerRadius: CGFloat!
 
 	var sounds: [String:SCNAudioSource] = [:]
 	var gameViewController: GameViewController!
@@ -37,35 +37,15 @@ class Game {
 	init(gameViewController: GameViewController) {
 		//self.sceneSize = sceneSize
 		self.gameViewController = gameViewController
-		setupHUD()
-		setupCamera()
 		setupRotatingCamera()
+		switchToRotatingCamera()
 		setupSounds()
 	}
 	
 	
-	func setupHUD() {
-		HUDScene = SKScene()
-		
-		HUDScene.size = CGSizeMake(1000, 500)
-		HUDScene.scaleMode = .ResizeFill
-		HUDScene.anchorPoint = CGPointMake(0, 0)
-		
-		controller = SKSpriteNode(imageNamed: "art.scnassets/controller.png")
-		controller.anchorPoint = CGPointZero
-		//controllerRadius = sceneSize * 0.25
-		controllerRadius = 50.0
-		controller.size = CGSizeMake(controllerRadius*2, controllerRadius*2)
-		controller.position = CGPointMake(10, 10)
-		controller.zPosition = 15
-		controller.hidden = true
-		
-		HUDScene.addChild(controller)
-	}
-	
 	// Camera (is .TapToPlay mode):
 	
-	func setupCamera() {
+	func setupRotatingCamera() {
 		cameraNode = gameViewController.levelScene.rootNode.childNodeWithName("cameraNode", recursively: true)!
 		
 		newGameCamera = gameViewController.levelScene.rootNode.childNodeWithName("newGameCamera", recursively: true)!
@@ -73,36 +53,52 @@ class Game {
 		newGameCamera.constraints = [SCNLookAtConstraint(target: gameViewController.floor)]
 	}
 	
-	func setupRotatingCamera() {
+	func switchToRotatingCamera() {
 		gameViewController.scnView.pointOfView = newGameCamera
-		
-		//floor.addParticleSystem(starsParticleSystem)
+		gameViewController.hudScene.hideController()
+	}
+	
+	func cameraShake(camera: SCNNode) {
+		let left = SCNAction.moveBy(SCNVector3(x: -1, y: 0.0, z: 0.0), duration: 0.2)
+		let right = SCNAction.moveBy(SCNVector3(x: 1, y: 0.0, z: 0.0), duration: 0.2)
+		let up = SCNAction.moveBy(SCNVector3(x: 0.0, y: 1, z: 0.0), duration: 0.2)
+		let down = SCNAction.moveBy(SCNVector3(x: 0.0, y: -1, z: 0.0), duration: 0.2)
+				
+		camera.runAction(SCNAction.sequence([
+			left, up, down, right, left, right, down, up, right, down, left, up,
+			left, up, down, right, left, right, down, up, right, down, left, up]))
 	}
 	
 	// Game:
 	
-	func newGameDisplay() {
-		//level cleared and restart the game should have diffrent labels
-		print("new game display")
-		gameViewController.scnView.pointOfView = newGameCamera
-		controller.hidden = true
-		
+	func newGameDisplay(newLevel newLevel: Bool) {
 		state = .TapToPlay
+		
+		if newLevel {
+			self.level += 1
+			//remove the current player, set new scene and all the nodes with new player
+			//gameViewController.playerClass.removeThePlayer()
+			gameViewController.setupSceneLevel(level)
+			gameViewController.playerClass.setupThePlayer()
+			gameViewController.playerClass.setupPlayersCamera()
+			gameViewController.setupNodes() // We have to set them again, because we changed the scene
+			setupRotatingCamera() //the camera that is set is not the right one!
+			switchToRotatingCamera()
+			//playBackgroundMusic()
+		}
+		
+		//level cleared and restart the game should have diffrent labels
+		gameViewController.scnView.pointOfView = newGameCamera
+		
 		lives = 10
+		//do sem dela
 	}
 	
 	func startTheGame() {
 		gameViewController.scnView.pointOfView = gameViewController.playerClass.camera
-		controller.hidden = false
+		gameViewController.hudScene.showController()
 		
 		state = .Play
-	}
-	
-	func switchToTapToPlayScene() {
-		state = .TapToPlay
-		controller.hidden = true //in .TapToPlay, we shoudnt be able to see the controller
-		lives = 10
-		setupRotatingCamera()
 	}
 		
 	func gameOver() {
@@ -110,35 +106,38 @@ class Game {
 	}
 	
 	func collisionWithNode(node: SCNNode) {
-		let geometry = node.categoryBitMask == PhysicsCategory.Pearl ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
-		let position = node.presentationNode.position
-		let explosion = node.categoryBitMask == PhysicsCategory.Pearl ? gameViewController.pearlExplosionParticleSystem : gameViewController.enemyExplosionParticleSystem
-		createExplosion(explosion, withGeometry: geometry, atPosition: position)
-		
 		node.hidden = true
-		node.runAction(SCNAction.waitForDurationThenRunBlock(12.0) { node in node.hidden = false })
+
+		let nodeMask = node.physicsBody?.categoryBitMask
+		let geometry = nodeMask == PhysicsCategory.Pearl ? SCNSphere(radius: 0.1) : SCNBox(width: 0.3, height: 0.3, length: 0.3, chamferRadius: 1.0)
+		let position = node.presentationNode.position
+		let explosion = nodeMask == PhysicsCategory.Pearl ? gameViewController.pearlExplosionParticleSystem : gameViewController.enemyExplosionParticleSystem
+		createExplosion(explosion, node: node,  withGeometry: geometry, atPosition: position)
 		
-		if node.categoryBitMask == PhysicsCategory.Pearl {
-			node.removeFromParentNode() // unless the player can wait on pearls to reappear and collect points
+		
+		if nodeMask == PhysicsCategory.Pearl {
+			node.removeFromParentNode() // otherwise the player can wait on pearls to reappear and collect points
 			lives += 1
-		} else if node.categoryBitMask == PhysicsCategory.Enemy {
+		} else if nodeMask == PhysicsCategory.Enemy {
+			node.runAction(SCNAction.waitForDurationThenRunBlock(12.0) { node in node.hidden = false })
+			cameraShake(gameViewController.playerClass.camera)
 			gameViewController.playerClass.animateTransparency()
 			lives -= 2
 		}
 	}
 	func collisionWithWinningPearl(pearl: SCNNode) {
-		newGameDisplay() //pointOfView: newGameCamera, hide controller, state: .TapToPlay, set 10 lives
-		//add particle system?
 		pearl.removeFromParentNode()
-		
-		gameViewController.setupSceneLevel(level + 1, gameSet: true)
+		newGameDisplay(newLevel: true) //pointOfView: newGameCamera, hide controller, state: .TapToPlay, set 10 lives
+		//add particle system?
+		//do sem dela
 	}
 	
-	func createExplosion(explosion: SCNParticleSystem, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
+	func createExplosion(explosion: SCNParticleSystem, node: SCNNode, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
 		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
 		explosion.emitterShape = geometry
 		
-		gameViewController.levelScene.addParticleSystem(explosion, withTransform: translationMatrix)
+		gameViewController.levelScene.addParticleSystem(explosion, withTransform: translationMatrix) //potem nastavi da bo node ekspolidro, ne levelScene?
+		
 	}
 	
 	//Sounds:
@@ -158,7 +157,7 @@ class Game {
 		//let sound = sounds["background"]
 		//gameViewController.playerClass.scnNode.runAction(SCNAction.repeatActionForever(SCNAction.playAudioSource(sound!, waitForCompletion: true)))
 		
-		//game crashes when music is playing
+		//game crashes when the music is playing
 	}
 	
 	func setupSounds() {
@@ -168,6 +167,7 @@ class Game {
 	
 	// Scoring?:
 	
+	/*
 	func bestScore() -> Int {
 		return NSUserDefaults.standardUserDefaults().integerForKey("BestScore")
 	}
@@ -189,5 +189,5 @@ class Game {
 			setBestScore(score)
 			//congratulations?
 		}
-	}
+	}*/
 }

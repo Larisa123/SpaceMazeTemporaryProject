@@ -18,16 +18,16 @@ struct PhysicsCategory {
 	static let Player: Int = 1
 	static let Wall: Int = 2
 	static let Pearl: Int = 4
-	static let WinningPearl: Int = 8
-	static let Floor: Int = 16
-	static let Enemy: Int = 32
+	static let Enemy: Int = 8
+	static let WinningPearl: Int = 16
+	static let Floor: Int = 32
 }
 
 
 class GameViewController: UIViewController {
 	
 	var scnView: SCNView!
-	weak var levelScene: SCNScene!
+	var levelScene: SCNScene!
 	var floor: SCNNode!
 	
 	var enemyExplosionParticleSystem: SCNParticleSystem!
@@ -37,23 +37,23 @@ class GameViewController: UIViewController {
 	var pearlParticleSystem: SCNParticleSystem!
 	var starsParticleSystem: SCNParticleSystem!
 	
-	var playerNode: SCNNode! //parent of player and playerSpotLight
 	var playerClass: Player!
-	var player: SCNNode!
 	var winningPearl: SCNNode!
 	
 	//HUD
-	var skHUDScene: SKScene!
-	var hudNode: SCNNode!
+	var hudScene: hudSKSScene!
 	
 	var game: Game!
 	var currentLevel = 1
+	var didNewLevelLoad = false
+	
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
 		setupView()
-		setupSceneLevel(1, gameSet: false)
+		setupSceneLevel(2) //which level to load
+		setupHUD()
 		setupPlayerClass()
 		setupParticleSystems()
 		setupNodes()
@@ -66,25 +66,22 @@ class GameViewController: UIViewController {
 		scnView.delegate = self
 	}
 	
-	func setupSceneLevel(level: Int, gameSet: Bool) {
-		if gameSet { playerClass.removeThePlayer() } //It means this is not the beginning of the game
-		
+	func setupSceneLevel(level: Int) {
+		didNewLevelLoad = false
 		levelScene = SCNScene(named: "Level\(level).scn")
-		
 		scnView.scene = levelScene
 		currentLevel = level
-		if gameSet {
-			game.level = level
-			game.playBackgroundMusic()
-		}
 		
 		levelScene.physicsWorld.contactDelegate = self
+		didNewLevelLoad = true
 	}
 	
-	func setupPlayerClass() {
-		playerClass = Player(viewController: self)
-		player = playerClass.scnNode
+	func setupHUD() {
+		hudScene = hudSKSScene(gameViewController: self)
+		scnView.overlaySKScene = hudScene
 	}
+	
+	func setupPlayerClass() { playerClass = Player(viewController: self) }
 	
 	func setupParticleSystems() {
 		enemyExplosionParticleSystem = SCNParticleSystem(named: "enemyExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
@@ -103,20 +100,23 @@ class GameViewController: UIViewController {
 				node.categoryBitMask = PhysicsCategory.Wall
 				node.physicsBody?.collisionBitMask = PhysicsCategory.Player
 				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+				//node.name = "wall"
 			}
 			if self.currentLevel > 1 { //level 1 has no pearls or enemys
 				if node.name == "pearl reference" {
 					node.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-					node.categoryBitMask = PhysicsCategory.Pearl
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+					//node.name = "pearl"
 					node.addParticleSystem(self.smallPearlParticleSystem)
 				}
 				if node.name == "enemy reference" {
 					node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: nil)
-					node.categoryBitMask = PhysicsCategory.Enemy
+					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+					//node.name = "enemy"
 					node.addParticleSystem(self.enemyParticleSystem)
 				}
 			}
@@ -126,33 +126,32 @@ class GameViewController: UIViewController {
 		floor.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
 		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor
 		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player
+		floor.physicsBody?.contactTestBitMask = PhysicsCategory.None
+		//floor.name = "floor"
 	
 		
 		//winning pearl
 		winningPearl = levelScene.rootNode.childNodeWithName("winningPearl reference", recursively: true)! //fatal error??
 		winningPearl.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
-		winningPearl.categoryBitMask = PhysicsCategory.WinningPearl
+		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
 		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None
 		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+		//winningPearl.name = "winningPearl"
 		winningPearl.addParticleSystem(pearlParticleSystem)
 	}
 	
 	func setupGameClass() {
 		game = Game(gameViewController: self)
-		
-		game.setupHUD()
-		skHUDScene = game.HUDScene
-		let hudScene = hudSKSScene(gameViewController: self)
-		scnView.overlaySKScene = hudScene
 		game.level = currentLevel
-		
-		game.playBackgroundMusic()
 	}
 	
 	override func shouldAutorotate() -> Bool { return true }
 	
 	override func prefersStatusBarHidden() -> Bool { return true }
+	
+	override func didReceiveMemoryWarning() { print("memory warning") }
 }
+
 
 extension GameViewController: SCNSceneRendererDelegate {
 	
@@ -170,15 +169,14 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
-			switch otherNode.categoryBitMask {
-			//case PhysicsCategory.Wall: //game.playSound(otherNode, name: "wallCrash")
-			case PhysicsCategory.Enemy: game.collisionWithNode(otherNode)
-			case PhysicsCategory.Pearl: game.collisionWithNode(otherNode)
-			case PhysicsCategory.WinningPearl: game.collisionWithWinningPearl(otherNode) // fatal errror?
-			default: break
+			if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Pearl || otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Enemy {
+				game.collisionWithNode(otherNode)
+			} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.WinningPearl {
+				game.collisionWithWinningPearl(otherNode)
+				return
 			}
 		}
-	}
+	} //do sem dela
 }
 
 
