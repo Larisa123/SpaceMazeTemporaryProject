@@ -45,7 +45,6 @@ class GameViewController: UIViewController {
 	
 	var game: Game!
 	var currentLevel = 1
-	var didNewLevelLoad = false
 	
 	
 	override func viewDidLoad() {
@@ -66,14 +65,16 @@ class GameViewController: UIViewController {
 		scnView.delegate = self
 	}
 	
-	func setupSceneLevel(level: Int) {
-		didNewLevelLoad = false
-		levelScene = SCNScene(named: "Level\(level).scn")
-		scnView.scene = levelScene
-		currentLevel = level
-		
-		levelScene.physicsWorld.contactDelegate = self
-		didNewLevelLoad = true
+	func setupSceneLevel(_ level: Int) {
+		if level <= 4 {
+			levelScene = SCNScene(named: "Level\(level).scn")
+			scnView.scene = levelScene
+			currentLevel = level
+			
+			levelScene.physicsWorld.contactDelegate = self
+		} else {
+			// Player has cleared all levels!
+		}
 	}
 	
 	func setupHUD() {
@@ -93,9 +94,9 @@ class GameViewController: UIViewController {
 	}
 	
 	func setupNodes() {
-		levelScene.rootNode.enumerateChildNodesUsingBlock { node, stop in
+		levelScene.rootNode.enumerateChildNodes { node, stop in
 			if node.name == "wallObject reference" {
-				node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: SCNPhysicsShape(geometry: SCNBox(width: 0.1, height: 0.5, length: 0.5, chamferRadius: 1.0) , options: nil))
+				node.physicsBody = SCNPhysicsBody(type: .kinematic, shape: nil)
 				node.physicsBody?.categoryBitMask = PhysicsCategory.Wall
 				node.categoryBitMask = PhysicsCategory.Wall
 				node.physicsBody?.collisionBitMask = PhysicsCategory.Player
@@ -104,7 +105,7 @@ class GameViewController: UIViewController {
 			}
 			if self.currentLevel > 1 { //level 1 has no pearls or enemys
 				if node.name == "pearl reference" {
-					node.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
+					node.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
 					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
@@ -112,7 +113,7 @@ class GameViewController: UIViewController {
 					node.addParticleSystem(self.smallPearlParticleSystem)
 				}
 				if node.name == "enemy reference" {
-					node.physicsBody = SCNPhysicsBody(type: .Kinematic, shape: nil)
+					node.physicsBody = SCNPhysicsBody(type: .kinematic, shape: nil)
 					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
@@ -122,8 +123,8 @@ class GameViewController: UIViewController {
 			}
 		}
 		
-		floor = levelScene.rootNode.childNodeWithName("floorObject reference", recursively: true)!
-		floor.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
+		floor = levelScene.rootNode.childNode(withName: "floorObject reference", recursively: true)!
+		floor.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
 		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor
 		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player
 		floor.physicsBody?.contactTestBitMask = PhysicsCategory.None
@@ -131,8 +132,8 @@ class GameViewController: UIViewController {
 	
 		
 		//winning pearl
-		winningPearl = levelScene.rootNode.childNodeWithName("winningPearl reference", recursively: true)! //fatal error??
-		winningPearl.physicsBody = SCNPhysicsBody(type: .Static, shape: nil)
+		winningPearl = levelScene.rootNode.childNode(withName: "winningPearl reference", recursively: true)! //fatal error??
+		winningPearl.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
 		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
 		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None
 		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player
@@ -145,9 +146,6 @@ class GameViewController: UIViewController {
 		game.level = currentLevel
 	}
 	
-	override func shouldAutorotate() -> Bool { return true }
-	
-	override func prefersStatusBarHidden() -> Bool { return true }
 	
 	override func didReceiveMemoryWarning() { print("memory warning") }
 }
@@ -155,15 +153,15 @@ class GameViewController: UIViewController {
 
 extension GameViewController: SCNSceneRendererDelegate {
 	
-	func renderer(renderer: SCNSceneRenderer, updateAtTime time: NSTimeInterval) {
-		if game.state == .TapToPlay { game.newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
+	func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+		if game.state == .tapToPlay { game.newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
 	}
 }
 
 extension GameViewController: SCNPhysicsContactDelegate {
 
-	func physicsWorld(world: SCNPhysicsWorld, didBeginContact contact: SCNPhysicsContact) {
-		if game.state == .Play {
+	func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
+		if game.state == .play {
 			let otherNode: SCNNode!			
 			
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }

@@ -15,13 +15,13 @@ class hudSKSScene: SKScene {
 	var gameViewController: GameViewController!
 	
 	init(gameViewController: GameViewController) {
-		super.init(size: CGSizeMake(600, 300))
+		super.init(size: CGSize(width: 600, height: 300))
 		self.gameViewController = gameViewController
 		
 		//setup the overlay scene
-		self.anchorPoint = CGPointZero
+		self.anchorPoint = CGPoint.zero
 		//automatically resize to fill the viewport
-		self.scaleMode = .ResizeFill
+		self.scaleMode = .resizeFill
 		//make UI larger on iPads
 		//var iPad: Bool = (UIDevice.currentDevice().userInterfaceIdiom() == .Pad)
 		//var scale: Float = iPad ? 1.5 : 1
@@ -29,56 +29,60 @@ class hudSKSScene: SKScene {
 		//myImage.yScale = 0.8 * scale
 		
 		controller = SKSpriteNode(imageNamed: "art.scnassets/circle-grey.png")
-		controller.anchorPoint = CGPointZero
-		controllerRadius = 60.0
-		controller.size = CGSizeMake(controllerRadius*2, controllerRadius*2)
-		controller.position = CGPointMake(30, 30)
+		controller.alpha = 0.3
+		controller.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+		controllerRadius = 65.0
+		controller.size = CGSize(width: controllerRadius*2, height: controllerRadius*2)
+		controller.position = CGPoint(x: controllerRadius + 10.0, y: controllerRadius + 10.0)
 		controller.zPosition = 10
 		
 		//size je 368x664?
-
-		//controller.position = CGPointMake(10, 10)
-		
 		self.addChild(controller)
 	}
 	
-	func hideController() { controller.hidden = true }
-	func showController() { controller.hidden = false }
+	func hideController() { controller.isHidden = true }
+	func showController() { controller.isHidden = false }
 	
-	override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
 		switch gameViewController.game.state {
-		case .TapToPlay:
-			if gameViewController.didNewLevelLoad { gameViewController.game.startTheGame() }
-		case .Play:
-			for touch in touches {
-				let touchLocationInView = touch.locationInView(gameViewController.scnView)
-				gameViewController.playerClass.moving = true
-				
-				if touchLocationInView.y > gameViewController.scnView.center.y + 50.0 {
-					gameViewController.playerClass.direction = .Forward
+			case .tapToPlay: gameViewController.game.startTheGame()
+			case .play:
+				for touch in touches {
+					if (atPoint(touch.location(in: self)) == controller) {
+						let touchLocationInController = touch.location(in: controller)
+						
+						gameViewController.playerClass.moving = true
+						
+						if touchLocationInController.y > 10.0 {
+							gameViewController.playerClass.direction = .forward
+						}
+						else if touchLocationInController.y < -10.0 {
+							gameViewController.playerClass.direction = .backward
+						}
+						else if touchLocationInController.x > 10.0 {
+							gameViewController.playerClass.direction = .right
+						}
+						else if touchLocationInController.x < -10.0 {
+							gameViewController.playerClass.direction = .left
+						}
+						else { gameViewController.playerClass.moving = false }
+						
+						if gameViewController.playerClass.moving {
+							gameViewController.playerClass.playerRoll()
+							//playerClass.updateCameraBasedOnPlayerDirection()
+						}
+					}
 				}
-				else if touchLocationInView.y < gameViewController.scnView.center.y - 50.0 {
-					gameViewController.playerClass.direction = .Backward
-				}
-				else if touchLocationInView.x > gameViewController.scnView.center.x + 20.0 {
-					gameViewController.playerClass.direction = .Right
-				}
-				else if touchLocationInView.x < gameViewController.scnView.center.x - 20.0 {
-					gameViewController.playerClass.direction = .Left
-				}
-				else { gameViewController.playerClass.moving = false }
-			}
-			if gameViewController.playerClass.moving {
-				gameViewController.playerClass.playerRoll()
-				//playerClass.updateCameraBasedOnPlayerDirection()
-			}
-		case .GameOver: break
-			//gameViewController.game.switchToTapToPlayScene()
+			case .gameOver: break //gameViewController.game.switchToTapToPlayScene()
 		}
 	}
 	
-	override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
-		if gameViewController.game.state == GameState.Play {
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+		gameViewController.game.newGameDisplay(newLevel: true)
+	}
+	
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+		if gameViewController.game.state == GameState.play {
 			gameViewController.playerClass.stopThePlayer()
 		}
 	}
