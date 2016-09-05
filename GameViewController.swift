@@ -95,14 +95,6 @@ class GameViewController: UIViewController {
 	
 	func setupNodes() {
 		levelScene.rootNode.enumerateChildNodes { node, stop in
-			if node.name == "wallObject reference" {
-				node.physicsBody = SCNPhysicsBody(type: .kinematic, shape: nil)
-				node.physicsBody?.categoryBitMask = PhysicsCategory.Wall
-				node.categoryBitMask = PhysicsCategory.Wall
-				node.physicsBody?.collisionBitMask = PhysicsCategory.Player
-				node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-				//node.name = "wall"
-			}
 			if self.currentLevel > 1 { //level 1 has no pearls or enemys
 				if node.name == "pearl reference" {
 					node.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
@@ -144,10 +136,14 @@ class GameViewController: UIViewController {
 	func setupGameClass() {
 		game = Game(gameViewController: self)
 		game.level = currentLevel
+		hudScene.lives = game.livesLeft
+
 	}
 	
 	
 	override func didReceiveMemoryWarning() { print("memory warning") }
+	
+	override var prefersStatusBarHidden: Bool { get { return true } }
 }
 
 

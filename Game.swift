@@ -20,7 +20,7 @@ class Game {
 	var level = 1
 	//var score = 0
 	//var highScore = 0
-	var lives:Int = 10
+	var livesLeft:Int = 9
 	var state: GameState = .tapToPlay
 	
 	//var HUDScene: SKScene!
@@ -56,6 +56,7 @@ class Game {
 	func switchToRotatingCamera() {
 		gameViewController.scnView.pointOfView = newGameCamera
 		gameViewController.hudScene.hideController()
+		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: false)
 	}
 	
 	func cameraShake(_ camera: SCNNode) {
@@ -86,18 +87,20 @@ class Game {
 			switchToRotatingCamera()
 			gameViewController.scnView.overlaySKScene = gameViewController.hudScene
 			//playBackgroundMusic()
+			gameViewController.hudScene.restoreHealthToFull()
 		}
 		
 		//level cleared and restart the game should have diffrent labels
 		gameViewController.scnView.pointOfView = newGameCamera
 		
-		lives = 10
+		//lives = 9
 		//do sem dela
 	}
 	
 	func startTheGame() {
 		gameViewController.scnView.pointOfView = gameViewController.playerClass.camera
 		gameViewController.hudScene.showController()
+		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: true)
 		
 		state = .play
 	}
@@ -118,12 +121,12 @@ class Game {
 		
 		if nodeMask == PhysicsCategory.Pearl {
 			node.removeFromParentNode() // otherwise the player can wait on pearls to reappear and collect points
-			lives += 1
+			gameViewController.hudScene.changeHealth(collidedWithPearl: true)
 		} else if nodeMask == PhysicsCategory.Enemy {
 			node.runAction(SCNAction.waitForDurationThenRunBlock(12.0) { node in node.isHidden = false })
 			//cameraShake(gameViewController.playerClass.camera!)
 			gameViewController.playerClass.animateTransparency()
-			lives -= 2
+			gameViewController.hudScene.changeHealth(collidedWithPearl: false)
 		}
 	}
 	func collisionWithWinningPearl(_ pearl: SCNNode) {

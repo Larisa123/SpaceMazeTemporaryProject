@@ -14,6 +14,11 @@ class hudSKSScene: SKScene {
 	var controllerRadius: CGFloat!
 	var gameViewController: GameViewController!
 	
+	//Hearts:
+	var lives: Int!
+	var hearts: [SKSpriteNode] = []
+	
+	
 	init(gameViewController: GameViewController) {
 		super.init(size: CGSize(width: 600, height: 300))
 		self.gameViewController = gameViewController
@@ -28,6 +33,11 @@ class hudSKSScene: SKScene {
 		//myImage.xScale = 0.8 * scale
 		//myImage.yScale = 0.8 * scale
 		
+		setupController()
+		setupHealthBar()
+	}
+	
+	func setupController() {
 		controller = SKSpriteNode(imageNamed: "art.scnassets/circle-grey.png")
 		controller.alpha = 0.3
 		controller.anchorPoint = CGPoint(x: 0.5, y: 0.5)
@@ -38,6 +48,59 @@ class hudSKSScene: SKScene {
 		
 		//size je 368x664?
 		self.addChild(controller)
+	}
+	
+	func setupHealthBar() {
+		for i in 0..<3 {
+			let heart = SKSpriteNode(imageNamed: "art.scnassets/heart.png")
+			heart.size = CGSize(width: 30, height: 30)
+			heart.position = CGPoint(x: 22.0 + Double(i) * 38.0, y: 546)
+			heart.isHidden = true
+			hearts.append(heart)
+			addChild(heart)
+		}
+	}
+	
+	func restoreHealthToFull() {
+		for heart in hearts {
+			heart.alpha = 1.0
+			heart.isHidden = true
+		}
+		lives = 9
+	}
+	
+	func makeHealthBarVisibleOrInvisible(visible: Bool) {
+		for heart in hearts { heart.isHidden = visible ? false: true }
+	}
+	
+	func changeHealth(collidedWithPearl: Bool) {
+		if collidedWithPearl { healthUp() }
+		else { healthDown() }
+	}
+	
+	func healthUp() {
+		if lives < 10 {
+			let heart = lives >= 6 ? hearts[2] : (lives >= 3 ? hearts[1] : hearts[0])
+			if heart.alpha < 0.7 { heart.run(SKAction.fadeAlpha(to: heart.alpha + 0.3, duration: 0.1)) }
+			else {
+				//ne vem se (naredit je treba da novega doda)
+			}
+			lives! += 1
+		}
+	}
+	
+	func healthDown() {
+		if lives - 3 <= 0 {
+			//GAME OVER!
+			return
+		}
+		
+		for _ in 0..<3 {
+			let heart = lives >= 6 ? hearts[2] : (lives >= 3 ? hearts[1] : hearts[0])
+			if heart.alpha > 0.3 { heart.run(SKAction.fadeAlpha(by: 0.3, duration: 0.1)) }
+			else { heart.isHidden = true }
+			lives! -= 1
+		}
 	}
 	
 	func hideController() { controller.isHidden = true }
