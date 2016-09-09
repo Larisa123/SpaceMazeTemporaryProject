@@ -15,7 +15,7 @@ class hudSKSScene: SKScene {
 	var gameViewController: GameViewController!
 	
 	//Hearts:
-	var lives: Int!
+	var lives = 9
 	var hearts: [SKSpriteNode] = []
 	
 	
@@ -27,34 +27,33 @@ class hudSKSScene: SKScene {
 		self.anchorPoint = CGPoint.zero
 		//automatically resize to fill the viewport
 		self.scaleMode = .resizeFill
-		//make UI larger on iPads
-		//var iPad: Bool = (UIDevice.currentDevice().userInterfaceIdiom() == .Pad)
-		//var scale: Float = iPad ? 1.5 : 1
-		//myImage.xScale = 0.8 * scale
-		//myImage.yScale = 0.8 * scale
 		
-		setupController()
-		setupHealthBar()
+		//make UI larger on iPads:
+		let scale: CGFloat = (UIDevice.current.userInterfaceIdiom == .pad) ? 1.3 : 1
+		
+		setupController(scale: scale)
+		setupHealthBar(scale: scale)
 	}
 	
-	func setupController() {
+	func setupController(scale: CGFloat) {
 		controller = SKSpriteNode(imageNamed: "art.scnassets/circle-grey.png")
-		controller.alpha = 0.3
+		controller.alpha = 0.2
 		controller.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-		controllerRadius = 65.0
-		controller.size = CGSize(width: controllerRadius*2, height: controllerRadius*2)
-		controller.position = CGPoint(x: controllerRadius + 10.0, y: controllerRadius + 10.0)
-		controller.zPosition = 10
+		controllerRadius = 65.0 * scale
+		controller.size = CGSize(width: controllerRadius*2*scale, height: controllerRadius*2*scale)
+		controller.position = CGPoint(x: controllerRadius * 1.2 * scale, y: controllerRadius * 1.2 * scale)
 		
-		//size je 368x664?
+		//size je 368x664
 		self.addChild(controller)
 	}
 	
-	func setupHealthBar() {
+	func setupHealthBar(scale: CGFloat) {
+		let heartSize =  CGSize(width: 30 * scale, height: 30 * scale)
+		
 		for i in 0..<3 {
 			let heart = SKSpriteNode(imageNamed: "art.scnassets/heart.png")
-			heart.size = CGSize(width: 30, height: 30)
-			heart.position = CGPoint(x: 22.0 + Double(i) * 38.0, y: 546)
+			heart.size = heartSize
+			heart.position = CGPoint(x: heartSize.width + CGFloat(i) * heartSize.width * 1.1, y: 548 * scale)
 			heart.isHidden = true
 			hearts.append(heart)
 			addChild(heart)
@@ -79,32 +78,35 @@ class hudSKSScene: SKScene {
 	}
 	
 	func healthUp() {
-		if lives < 10 {
+		if lives < 9 {
 			let heart = lives >= 6 ? hearts[2] : (lives >= 3 ? hearts[1] : hearts[0])
 			if heart.alpha < 0.7 { heart.run(SKAction.fadeAlpha(to: heart.alpha + 0.3, duration: 0.1)) }
 			else {
 				//ne vem se (naredit je treba da novega doda)
 			}
-			lives! += 1
+			lives += 1
 		}
 	}
 	
 	func healthDown() {
-		if lives - 3 <= 0 {
-			//GAME OVER!
-			return
-		}
-		
 		for _ in 0..<3 {
 			let heart = lives >= 6 ? hearts[2] : (lives >= 3 ? hearts[1] : hearts[0])
-			if heart.alpha > 0.3 { heart.run(SKAction.fadeAlpha(by: 0.3, duration: 0.1)) }
+			if heart.alpha > 0.4 {
+				//heart.run(SKAction.fadeAlpha(by: 0.3, duration: 0.1))
+				heart.alpha -= 0.3
+			}
 			else { heart.isHidden = true }
-			lives! -= 1
+			lives -= 1
+			if lives == 0 { gameViewController.game.gameOver() }
 		}
 	}
 	
 	func hideController() { controller.isHidden = true }
 	func showController() { controller.isHidden = false }
+	
+	func isTouchOnTheOutsideEdge(touchLocation: CGPoint) -> Bool {
+		return abs(touchLocation.x) > controllerRadius/2 || abs(touchLocation.y) > controllerRadius/2
+	}
 	
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
 		switch gameViewController.game.state {
@@ -114,35 +116,55 @@ class hudSKSScene: SKScene {
 					if (atPoint(touch.location(in: self)) == controller) {
 						let touchLocationInController = touch.location(in: controller)
 						
-						gameViewController.playerClass.moving = true
-						
-						if touchLocationInController.y > 10.0 {
-							gameViewController.playerClass.direction = .forward
-						}
-						else if touchLocationInController.y < -10.0 {
-							gameViewController.playerClass.direction = .backward
-						}
-						else if touchLocationInController.x > 10.0 {
-							gameViewController.playerClass.direction = .right
-						}
-						else if touchLocationInController.x < -10.0 {
-							gameViewController.playerClass.direction = .left
-						}
-						else { gameViewController.playerClass.moving = false }
-						
-						if gameViewController.playerClass.moving {
+						if isTouchOnTheOutsideEdge(touchLocation: touchLocationInController) {
+							gameViewController.playerClass.moving = true
+							
+							let angle = atan2(touchLocationInController.y, touchLocationInController.x) * 180 / pi // in degrees
+							
+							switch angle {
+							case -125...(-55): gameViewController.playerClass.direction = .backward
+							case -35...35: gameViewController.playerClass.direction = .right
+							case 55...125: gameViewController.playerClass.direction = .forward
+							case 145...180, -180...(-145): gameViewController.playerClass.direction = .left
+							default:
+								gameViewController.playerClass.moving = false
+								return
+							}
 							gameViewController.playerClass.playerRoll()
-							//playerClass.updateCameraBasedOnPlayerDirection()
 						}
 					}
 				}
-			case .gameOver: break //gameViewController.game.switchToTapToPlayScene()
+			case .gameOver: gameViewController.game.newGameDisplay(newLevel: false)
 		}
 	}
 	
+	
 	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-		gameViewController.game.newGameDisplay(newLevel: true)
+		if gameViewController.game.state == .play {
+			for touch in touches {
+				if (atPoint(touch.location(in: self)) == controller) {
+					let touchLocationInController = touch.location(in: controller)
+					
+					if isTouchOnTheOutsideEdge(touchLocation: touchLocationInController) {
+						gameViewController.playerClass.moving = true
+						
+						let angle = atan2(touchLocationInController.y, touchLocationInController.x) * 180 / pi // in degrees
+						switch angle {
+						case -125...(-55): gameViewController.playerClass.direction = .backward
+						case -35...35: gameViewController.playerClass.direction = .right
+						case 55...125: gameViewController.playerClass.direction = .forward
+						case 145...180, -180...(-145): gameViewController.playerClass.direction = .left
+						default:
+							gameViewController.playerClass.moving = false
+							return
+						}
+						gameViewController.playerClass.playerRoll()
+					}
+				}
+			}
+		}
 	}
+
 	
 	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
 		if gameViewController.game.state == GameState.play {

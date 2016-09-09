@@ -12,6 +12,7 @@ import UIKit
 import SceneKit
 import Darwin
 import SpriteKit
+import AVFoundation
 
 struct PhysicsCategory {
 	static let None: Int = 0
@@ -22,6 +23,8 @@ struct PhysicsCategory {
 	static let WinningPearl: Int = 16
 	static let Floor: Int = 32
 }
+
+var backgroundMusicPlayer:AVAudioPlayer = AVAudioPlayer()
 
 
 class GameViewController: UIViewController {
@@ -51,6 +54,7 @@ class GameViewController: UIViewController {
 		super.viewDidLoad()
 		
 		setupView()
+		playBackgroundMusic()
 		setupSceneLevel(2) //which level to load
 		setupHUD()
 		setupPlayerClass()
@@ -63,6 +67,14 @@ class GameViewController: UIViewController {
 	func setupView() {
 		scnView = self.view as! SCNView
 		scnView.delegate = self
+	}
+	
+	func playBackgroundMusic() {
+		let bgMusicURL:URL = Bundle.main.url(forResource: "art.scnassets/Sounds/Puzzle-Game_Looping", withExtension: "mp3")!
+		do { backgroundMusicPlayer = try AVAudioPlayer(contentsOf: bgMusicURL) } catch _ {return }
+		backgroundMusicPlayer.numberOfLoops = -1
+		backgroundMusicPlayer.prepareToPlay()
+		backgroundMusicPlayer.play()
 	}
 	
 	func setupSceneLevel(_ level: Int) {
@@ -136,7 +148,6 @@ class GameViewController: UIViewController {
 	func setupGameClass() {
 		game = Game(gameViewController: self)
 		game.level = currentLevel
-		hudScene.lives = game.livesLeft
 
 	}
 	
@@ -151,6 +162,7 @@ extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
 		if game.state == .tapToPlay { game.newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
+		else if game.state == .play { playerClass.updateCameraThatFollowsThePlayer() }
 	}
 }
 

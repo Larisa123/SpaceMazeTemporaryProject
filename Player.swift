@@ -25,11 +25,12 @@ class Player {
 	var scnNode: SCNNode?
 	var direction: PlayerCurrentDirection = .forward
 	var cameraDirection: CameraCurrentDirection = .forward
-	var velocityMagnitude: Float = 1.5
+	var velocityMagnitude: Float = 0.9
 	var fadeAndIncreaseOpacityAction: SCNAction!
 	//var light: SCNNode!
 	
 	var camera: SCNNode? //camera that follows the player
+	var cameraNode: SCNNode? //camera selfie stick
 	var spotLight: SCNNode? //light that shines on the player
 	
 	var moving = false
@@ -48,6 +49,7 @@ class Player {
 	
 	func setupPlayersCamera() {
 		camera = gameViewController.levelScene.rootNode.childNode(withName: "playerCamera", recursively: true)!
+		cameraNode = gameViewController.levelScene.rootNode.childNode(withName: "cameraNode", recursively: true)!
 		spotLight = gameViewController.levelScene.rootNode.childNode(withName: "playerSpotLight", recursively: true)!
 		
 		camera?.constraints = [SCNLookAtConstraint(target: self.scnNode?.presentation)]
@@ -77,12 +79,12 @@ class Player {
 	
 	func playerRoll() {
 		if direction == .forward {
-			scnNode?.physicsBody?.velocity = SCNVector3(x: 0, y: 0, z: velocityMagnitude)
-			scnNode?.physicsBody?.angularVelocity = SCNVector4Make(1, 0, 0, velocityMagnitude * 3.4)
-		}
-		else if direction == .backward {
 			scnNode?.physicsBody?.velocity = SCNVector3(x: 0, y: 0, z: -velocityMagnitude)
 			scnNode?.physicsBody?.angularVelocity = SCNVector4Make(-1, 0, 0, velocityMagnitude * 3.4)
+		}
+		else if direction == .backward {
+			scnNode?.physicsBody?.velocity = SCNVector3(x: 0, y: 0, z: velocityMagnitude)
+			scnNode?.physicsBody?.angularVelocity = SCNVector4Make(1, 0, 0, velocityMagnitude * 3.4)
 		}
 		else if direction == .right {
 			scnNode?.physicsBody?.velocity = SCNVector3(x: velocityMagnitude, y: 0, z: 0)
@@ -104,7 +106,11 @@ class Player {
 	}
 	
 	//camera:
+	func updateCameraThatFollowsThePlayer() {
+		if cameraNode != nil { cameraNode!.position = scnNode!.presentation.position }
+	}
 	
+	/*
 	func updateCameraBasedOnPlayerDirection() {
 		if ((camera != nil) && (scnNode != nil)) {
 			camera!.position = scnNode!.presentation.position
@@ -112,10 +118,9 @@ class Player {
 		//if player changed direction, we have to rotate the cameraNode (a selfie stick for playerCamera)
 		let playerDirectionUnchanged = cameraDirection == cameraDirection
 		if !playerDirectionUnchanged {
-			//updateCameraDirection()
+			updateCameraDirection()
 		}
 	}
-	
 	func updateCameraDirection() {
 		let rotateAction: SCNAction!
 		
@@ -127,6 +132,7 @@ class Player {
 		}
 		camera?.runAction(rotateAction)
 	}
+	*/
 	
 	required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented")}
 }

@@ -18,14 +18,7 @@ enum GameState {
 
 class Game {
 	var level = 1
-	//var score = 0
-	//var highScore = 0
-	var livesLeft:Int = 9
 	var state: GameState = .tapToPlay
-	
-	//var HUDScene: SKScene!
-	//var controller: SKSpriteNode!
-	//var controllerRadius: CGFloat!
 
 	var sounds: [String:SCNAudioSource] = [:]
 	var gameViewController: GameViewController!
@@ -35,7 +28,6 @@ class Game {
 	var newGameCamera: SCNNode!
 	
 	init(gameViewController: GameViewController) {
-		//self.sceneSize = sceneSize
 		self.gameViewController = gameViewController
 		setupRotatingCamera()
 		switchToRotatingCamera()
@@ -43,7 +35,7 @@ class Game {
 	}
 	
 	
-	// Camera (is .TapToPlay mode):
+	// Camera (in .TapToPlay mode):
 	
 	func setupRotatingCamera() {
 		cameraNode = gameViewController.levelScene.rootNode.childNode(withName: "cameraNode", recursively: true)!
@@ -59,7 +51,7 @@ class Game {
 		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: false)
 	}
 	
-	func cameraShake(_ camera: SCNNode) {
+	func shake(camera: SCNNode) {
 		let left = SCNAction.move(by: SCNVector3(x: -1, y: 0.0, z: 0.0), duration: 0.2)
 		let right = SCNAction.move(by: SCNVector3(x: 1, y: 0.0, z: 0.0), duration: 0.2)
 		let up = SCNAction.move(by: SCNVector3(x: 0.0, y: 1, z: 0.0), duration: 0.2)
@@ -84,17 +76,15 @@ class Game {
 			gameViewController.playerClass.setupPlayersCamera()
 			gameViewController.setupNodes() // We have to set them again, because we changed the scene
 			setupRotatingCamera() //the camera that is set is not the right one!
+			print("Level cleared. New level: \(level)")
 			switchToRotatingCamera()
 			gameViewController.scnView.overlaySKScene = gameViewController.hudScene
-			//playBackgroundMusic()
 			gameViewController.hudScene.restoreHealthToFull()
 		}
 		
 		//level cleared and restart the game should have diffrent labels
 		gameViewController.scnView.pointOfView = newGameCamera
-		
-		//lives = 9
-		//do sem dela
+		gameViewController.hudScene.restoreHealthToFull()
 	}
 	
 	func startTheGame() {
@@ -107,6 +97,7 @@ class Game {
 		
 	func gameOver() {
 		state = .gameOver
+		newGameDisplay(newLevel: false)
 	}
 	
 	func collisionWithNode(_ node: SCNNode) {
@@ -131,17 +122,18 @@ class Game {
 	}
 	func collisionWithWinningPearl(_ pearl: SCNNode) {
 		pearl.removeFromParentNode()
-		newGameDisplay(newLevel: true) //pointOfView: newGameCamera, hide controller, state: .TapToPlay, set 10 lives
+		newGameDisplay(newLevel: true) //sets pointOfView: newGameCamera, hides controller, sets state to .TapToPlay, restores health
 		//add particle system?
-		//do sem dela
 	}
 	
 	func createExplosion(_ explosion: SCNParticleSystem, node: SCNNode, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
 		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
 		explosion.emitterShape = geometry
 		
-		gameViewController.levelScene.addParticleSystem(explosion, transform: translationMatrix) //potem nastavi da bo node ekspolidro, ne levelScene?
+		gameViewController.levelScene.addParticleSystem(explosion, transform: translationMatrix)
 		
+		//let soundName: String = (node.physicsBody?.categoryBitMask == PhysicsCategory.Enemy) ? "enemyExplosion": "pearlExplosion"
+		//playSound(node: node, name: soundName)
 	}
 	
 	//Sounds:
@@ -153,45 +145,11 @@ class Game {
 	}
 	
 	func playSound(node:SCNNode, name:String) {
-		//let sound = sounds[name]
-		//node.runAction(SCNAction.playSound(sound!, waitForCompletion: false))
-	}
-	
-	func playBackgroundMusic() {
-		//let sound = sounds["background"]
-		//gameViewController.playerClass.scnNode.runAction(SCNAction.repeatActionForever(SCNAction.playAudioSource(sound!, waitForCompletion: true)))
-		
-		//game crashes when the music is playing
+		let sound = sounds[name]
+		node.runAction(SCNAction.playAudio(sound!, waitForCompletion: true))
 	}
 	
 	func setupSounds() {
 		loadSound("wallCrash", fileNamed: "art.scnassets/Sounds/projectileHit.wav") // I have to fix it so it only plays once and more quitely
-		loadSound("background", fileNamed: "art.scnassets/Sounds/Puzzle-Game_Looping.mp3")
 	}
-	
-	// Scoring?:
-	
-	/*
-	func bestScore() -> Int {
-		return NSUserDefaults.standardUserDefaults().integerForKey("BestScore")
-	}
-	
-	func setBestScore(bestScore: Int) {
-		NSUserDefaults.standardUserDefaults().setInteger(bestScore, forKey: "BestScore")
-		NSUserDefaults.standardUserDefaults().synchronize()
-	}
-	
-	func saveState() {
-		highScore = max(score, highScore)
-		let defaults = NSUserDefaults.standardUserDefaults()
-		defaults.setInteger(highScore, forKey: "highScore")
-		NSUserDefaults.standardUserDefaults().synchronize()
-	}
-	
-	func determineBestScore() {
-		if score > bestScore() {
-			setBestScore(score)
-			//congratulations?
-		}
-	}*/
 }
