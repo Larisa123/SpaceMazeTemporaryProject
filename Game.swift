@@ -23,9 +23,8 @@ class Game {
 	var sounds: [String:SCNAudioSource] = [:]
 	var gameViewController: GameViewController!
 	
-	var cameraNode: SCNNode!
-	var newGameCameraSelfieStickNode: SCNNode!
-	var newGameCamera: SCNNode!
+	var newGameCameraSelfieStickNode: SCNNode?
+	var newGameCamera: SCNNode?
 	
 	init(gameViewController: GameViewController) {
 		self.gameViewController = gameViewController
@@ -38,28 +37,17 @@ class Game {
 	// Camera (in .TapToPlay mode):
 	
 	func setupRotatingCamera() {
-		cameraNode = gameViewController.levelScene.rootNode.childNode(withName: "cameraNode", recursively: true)!
-		
 		newGameCamera = gameViewController.levelScene.rootNode.childNode(withName: "newGameCamera", recursively: true)!
-		newGameCameraSelfieStickNode = gameViewController.levelScene.rootNode.childNode(withName: "newGameCameraSelfieStick", recursively: true)!
-		newGameCamera.constraints = [SCNLookAtConstraint(target: gameViewController.floor)]
+		newGameCameraSelfieStickNode = gameViewController.levelScene.rootNode.childNode(withName: "newGameCameraSelfieStick reference", recursively: true)!
+		newGameCamera?.constraints = [SCNLookAtConstraint(target: gameViewController.floor)]
 	}
 	
 	func switchToRotatingCamera() {
 		gameViewController.scnView.pointOfView = newGameCamera
 		gameViewController.hudScene.hideController()
 		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: false)
-	}
-	
-	func shake(camera: SCNNode) {
-		let left = SCNAction.move(by: SCNVector3(x: -1, y: 0.0, z: 0.0), duration: 0.2)
-		let right = SCNAction.move(by: SCNVector3(x: 1, y: 0.0, z: 0.0), duration: 0.2)
-		let up = SCNAction.move(by: SCNVector3(x: 0.0, y: 1, z: 0.0), duration: 0.2)
-		let down = SCNAction.move(by: SCNVector3(x: 0.0, y: -1, z: 0.0), duration: 0.2)
-				
-		camera.runAction(SCNAction.sequence([
-			left, up, down, right, left, right, down, up, right, down, left, up,
-			left, up, down, right, left, right, down, up, right, down, left, up]))
+		
+		gameViewController.hudScene.setLabel(text: "Tap To Play!")
 	}
 	
 	// Game:
@@ -69,18 +57,16 @@ class Game {
 		
 		if newLevel {
 			self.level += 1
-			//remove the current player, set new scene and all the nodes with new player
-			//gameViewController.playerClass.removeThePlayer()
 			gameViewController.setupSceneLevel(level)
 			gameViewController.playerClass.setupThePlayer()
 			gameViewController.playerClass.setupPlayersCamera()
 			gameViewController.setupNodes() // We have to set them again, because we changed the scene
 			setupRotatingCamera() //the camera that is set is not the right one!
-			print("Level cleared. New level: \(level)")
 			switchToRotatingCamera()
 			gameViewController.scnView.overlaySKScene = gameViewController.hudScene
 			gameViewController.hudScene.restoreHealthToFull()
-		}
+			gameViewController.hudScene.setLabel(text: "Level \(level-1) cleared! Tap To Play!")
+		} else { gameViewController.hudScene.setLabel(text: "Game Over! Tap To Play Again!") }
 		
 		//level cleared and restart the game should have diffrent labels
 		gameViewController.scnView.pointOfView = newGameCamera
@@ -89,6 +75,7 @@ class Game {
 	
 	func startTheGame() {
 		gameViewController.scnView.pointOfView = gameViewController.playerClass.camera
+		gameViewController.hudScene.hideLabel()
 		gameViewController.hudScene.showController()
 		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: true)
 		
@@ -113,9 +100,11 @@ class Game {
 		if nodeMask == PhysicsCategory.Pearl {
 			node.removeFromParentNode() // otherwise the player can wait on pearls to reappear and collect points
 			gameViewController.hudScene.changeHealth(collidedWithPearl: true)
+				playSound(node: gameViewController.playerClass.scnNode, name: "PowerUp")
+			
 		} else if nodeMask == PhysicsCategory.Enemy {
 			node.runAction(SCNAction.waitForDurationThenRunBlock(12.0) { node in node.isHidden = false })
-			//cameraShake(gameViewController.playerClass.camera!)
+			gameViewController.playerClass.cameraShake()
 			gameViewController.playerClass.animateTransparency()
 			gameViewController.hudScene.changeHealth(collidedWithPearl: false)
 		}
@@ -131,9 +120,8 @@ class Game {
 		explosion.emitterShape = geometry
 		
 		gameViewController.levelScene.addParticleSystem(explosion, transform: translationMatrix)
-		
-		//let soundName: String = (node.physicsBody?.categoryBitMask == PhysicsCategory.Enemy) ? "enemyExplosion": "pearlExplosion"
-		//playSound(node: node, name: soundName)
+	
+		playSound(node: node, name: "Explosion")
 	}
 	
 	//Sounds:
@@ -144,12 +132,17 @@ class Game {
 		sounds[name] = sound
 	}
 	
-	func playSound(node:SCNNode, name:String) {
-		let sound = sounds[name]
-		node.runAction(SCNAction.playAudio(sound!, waitForCompletion: true))
+	func playSound(node:SCNNode?, name:String) {
+		if node != nil {
+			let sound = sounds[name]
+			node!.runAction(SCNAction.playAudio(sound!, waitForCompletion: true))
+		}
 	}
 	
 	func setupSounds() {
-		loadSound("wallCrash", fileNamed: "art.scnassets/Sounds/projectileHit.wav") // I have to fix it so it only plays once and more quitely
+		loadSound("WallCrash", fileNamed: "art.scnassets/Sounds/WallCrash.wav")
+		loadSound("Explosion", fileNamed: "art.scnassets/Sounds/Explosion.wav")
+		loadSound("LevelUp", fileNamed: "art.scnassets/Sounds/LevelUp.mp3")
+		loadSound("PowerUp", fileNamed: "art.scnassets/Sounds/PowerUp.mp3")
 	}
 }

@@ -30,6 +30,7 @@ var backgroundMusicPlayer:AVAudioPlayer = AVAudioPlayer()
 class GameViewController: UIViewController {
 	
 	var scnView: SCNView!
+	var deviceSize: CGSize!
 	var levelScene: SCNScene!
 	var floor: SCNNode!
 	
@@ -48,20 +49,23 @@ class GameViewController: UIViewController {
 	
 	var game: Game!
 	var currentLevel = 1
+	let maxLevel = 3
 	
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
+		deviceSize = UIScreen.main.bounds.size
+		
 		setupView()
 		playBackgroundMusic()
-		setupSceneLevel(2) //which level to load
+		setupSceneLevel(1) //which level to load
 		setupHUD()
-		setupPlayerClass()
+		setupPlayerClass() // on PlayerClass initialization, player and the camera that follows the player is initialized
 		setupParticleSystems()
-		setupNodes()
+		setupNodes() // we setup properties to nodes set in scenes and add them particle systems
 		
-		setupGameClass() //on Game class initialization, cameras and sounds are automatically initializied
+		setupGameClass() //on GameClass initialization, cameras and sounds are automatically initializied
 	}
 	
 	func setupView() {
@@ -72,20 +76,19 @@ class GameViewController: UIViewController {
 	func playBackgroundMusic() {
 		let bgMusicURL:URL = Bundle.main.url(forResource: "art.scnassets/Sounds/Puzzle-Game_Looping", withExtension: "mp3")!
 		do { backgroundMusicPlayer = try AVAudioPlayer(contentsOf: bgMusicURL) } catch _ {return }
-		backgroundMusicPlayer.numberOfLoops = -1
-		backgroundMusicPlayer.prepareToPlay()
-		backgroundMusicPlayer.play()
+		backgroundMusicPlayer.numberOfLoops = -1 //loops the sound
+		if backgroundMusicPlayer.prepareToPlay() { backgroundMusicPlayer.play() }
 	}
 	
 	func setupSceneLevel(_ level: Int) {
-		if level <= 4 {
+		if level <= maxLevel {
 			levelScene = SCNScene(named: "Level\(level).scn")
 			scnView.scene = levelScene
 			currentLevel = level
 			
 			levelScene.physicsWorld.contactDelegate = self
 		} else {
-			// Player has cleared all levels!
+			hudScene.setLabel(text: "You have cleared all levels!")
 		}
 	}
 	
@@ -161,7 +164,7 @@ class GameViewController: UIViewController {
 extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-		if game.state == .tapToPlay { game.newGameCameraSelfieStickNode.eulerAngles.y += 0.002 }
+		if game.state == .tapToPlay { game.newGameCameraSelfieStickNode?.eulerAngles.y += 0.002 }
 		else if game.state == .play { playerClass.updateCameraThatFollowsThePlayer() }
 	}
 }
@@ -175,14 +178,16 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
-			if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Pearl || otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Enemy {
+			
+			if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Wall {
+				game.playSound(node: otherNode, name: "WallCrash")
+			} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Pearl || otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Enemy {
 				game.collisionWithNode(otherNode)
 			} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.WinningPearl {
 				game.collisionWithWinningPearl(otherNode)
-				return
 			}
 		}
-	} //do sem dela
+	}
 }
 
 
