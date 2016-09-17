@@ -21,7 +21,9 @@ struct PhysicsCategory {
 	static let Pearl: Int = 4
 	static let Enemy: Int = 8
 	static let WinningPearl: Int = 16
-	static let Floor: Int = 32
+	static let firstCornerNode: Int = 32
+	static let secondCornerNode: Int = 64
+	static let Floor: Int = 128
 }
 
 var backgroundMusicPlayer:AVAudioPlayer = AVAudioPlayer()
@@ -31,18 +33,19 @@ class GameViewController: UIViewController {
 	
 	var scnView: SCNView!
 	var deviceSize: CGSize!
-	var levelScene: SCNScene!
-	var floor: SCNNode!
+	var levelScene: SCNScene?
+	var floor: SCNNode?
 	
 	var enemyExplosionParticleSystem: SCNParticleSystem!
 	var enemyParticleSystem: SCNParticleSystem!
 	var pearlExplosionParticleSystem: SCNParticleSystem!
 	var smallPearlParticleSystem: SCNParticleSystem!
 	var pearlParticleSystem: SCNParticleSystem!
-	var starsParticleSystem: SCNParticleSystem!
+	//var starsParticleSystem: SCNParticleSystem!
 	
 	var playerClass: Player!
-	var winningPearl: SCNNode!
+	var winningPearl: SCNNode?
+	var firstCornerNode: SCNNode?
 	
 	//HUD
 	var hudScene: hudSKSScene!
@@ -83,10 +86,10 @@ class GameViewController: UIViewController {
 	func setupSceneLevel(_ level: Int) {
 		if level <= maxLevel {
 			levelScene = SCNScene(named: "Level\(level).scn")
-			scnView.scene = levelScene
+			if levelScene != nil { scnView.scene = levelScene! }
 			currentLevel = level
 			
-			levelScene.physicsWorld.contactDelegate = self
+			levelScene?.physicsWorld.contactDelegate = self
 		} else {
 			hudScene.setLabel(text: "You have cleared all levels!")
 		}
@@ -104,19 +107,18 @@ class GameViewController: UIViewController {
 		enemyParticleSystem = SCNParticleSystem(named: "enemyParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
 		pearlExplosionParticleSystem = SCNParticleSystem(named: "pearlExplodeParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
 		pearlParticleSystem = SCNParticleSystem(named: "pearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
-		smallPearlParticleSystem = SCNParticleSystem(named: "smallPearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")! //change the texture?
-		starsParticleSystem = SCNParticleSystem(named: "starsParticleSystem.scnp", inDirectory: "art.scnassets/Particles/starsParticleSystem.scnp")
+		smallPearlParticleSystem = SCNParticleSystem(named: "smallPearlParticleSystem.scnp", inDirectory: "art.scnassets/Particles")!
+		//starsParticleSystem = SCNParticleSystem(named: "starsParticleSystem.scnp", inDirectory: "art.scnassets/Particles/starsParticleSystem.scnp")
 	}
 	
 	func setupNodes() {
-		levelScene.rootNode.enumerateChildNodes { node, stop in
+		levelScene?.rootNode.enumerateChildNodes { node, stop in
 			if self.currentLevel > 1 { //level 1 has no pearls or enemys
 				if node.name == "pearl reference" {
 					node.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
 					node.physicsBody?.categoryBitMask = PhysicsCategory.Pearl
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-					//node.name = "pearl"
 					node.addParticleSystem(self.smallPearlParticleSystem)
 				}
 				if node.name == "enemy reference" {
@@ -124,28 +126,38 @@ class GameViewController: UIViewController {
 					node.physicsBody?.categoryBitMask = PhysicsCategory.Enemy
 					node.physicsBody?.collisionBitMask = PhysicsCategory.None
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-					//node.name = "enemy"
 					node.addParticleSystem(self.enemyParticleSystem)
 				}
 			}
 		}
 		
-		floor = levelScene.rootNode.childNode(withName: "floorObject reference", recursively: true)!
-		floor.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
-		floor.physicsBody?.categoryBitMask = PhysicsCategory.Floor
-		floor.physicsBody?.collisionBitMask = PhysicsCategory.Player
-		floor.physicsBody?.contactTestBitMask = PhysicsCategory.None
-		//floor.name = "floor"
-	
+		if currentLevel == 1 {
+			let firstCornerNode = levelScene?.rootNode.childNode(withName: "firstCornerNode", recursively: true)
+			firstCornerNode?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
+			firstCornerNode?.physicsBody?.categoryBitMask = PhysicsCategory.firstCornerNode
+			firstCornerNode?.physicsBody?.collisionBitMask = PhysicsCategory.None
+			firstCornerNode?.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+			
+			let secondCornerNode = levelScene?.rootNode.childNode(withName: "secondCornerNode", recursively: true)
+			secondCornerNode?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
+			secondCornerNode?.physicsBody?.categoryBitMask = PhysicsCategory.secondCornerNode
+			secondCornerNode?.physicsBody?.collisionBitMask = PhysicsCategory.None
+			secondCornerNode?.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+		}
+		
+		floor = levelScene?.rootNode.childNode(withName: "floorObject reference", recursively: true)
+		floor?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
+		floor?.physicsBody?.categoryBitMask = PhysicsCategory.Floor
+		floor?.physicsBody?.collisionBitMask = PhysicsCategory.Player
+		floor?.physicsBody?.contactTestBitMask = PhysicsCategory.None
 		
 		//winning pearl
-		winningPearl = levelScene.rootNode.childNode(withName: "winningPearl reference", recursively: true)! //fatal error??
-		winningPearl.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
-		winningPearl.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
-		winningPearl.physicsBody?.collisionBitMask = PhysicsCategory.None
-		winningPearl.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-		//winningPearl.name = "winningPearl"
-		winningPearl.addParticleSystem(pearlParticleSystem)
+		winningPearl = levelScene?.rootNode.childNode(withName: "winningPearl reference", recursively: true)
+		winningPearl?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
+		winningPearl?.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
+		winningPearl?.physicsBody?.collisionBitMask = PhysicsCategory.None
+		winningPearl?.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+		winningPearl?.addParticleSystem(pearlParticleSystem)
 	}
 	
 	func setupGameClass() {
@@ -165,7 +177,13 @@ extension GameViewController: SCNSceneRendererDelegate {
 	
 	func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
 		if game.state == .tapToPlay { game.newGameCameraSelfieStickNode?.eulerAngles.y += 0.002 }
-		else if game.state == .play { playerClass.updateCameraThatFollowsThePlayer() }
+		else if game.state == .play {
+			playerClass.updateCameraThatFollowsThePlayer()
+			
+			if (playerClass.scnNode?.presentation.position.y)! < -15.0 {
+				game.gameOver()
+			}
+		}
 	}
 }
 
@@ -178,6 +196,14 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
+			if currentLevel == 1 {
+				if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.firstCornerNode {
+					game.tutorialNextStep(stopActionForName: "right")
+				} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.secondCornerNode {
+					game.tutorialNextStep(stopActionForName: "down")
+				}
+			}
+			
 			
 			if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Wall {
 				game.playSound(node: otherNode, name: "WallCrash")
@@ -189,5 +215,3 @@ extension GameViewController: SCNPhysicsContactDelegate {
 		}
 	}
 }
-
-

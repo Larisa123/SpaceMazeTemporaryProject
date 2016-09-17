@@ -47,8 +47,8 @@ class Player {
 	}
 	
 	func setupPlayersCamera() {
-		camera = gameViewController.levelScene.rootNode.childNode(withName: "playerCamera", recursively: true)! // ne vem ce bo slo!
-		cameraNode = gameViewController.levelScene.rootNode.childNode(withName: "cameraNode reference", recursively: true)!
+		camera =  gameViewController.levelScene?.rootNode.childNode(withName: "playerCamera", recursively: true)
+		cameraNode = gameViewController.levelScene?.rootNode.childNode(withName: "cameraNode reference", recursively: true)
 		
 		camera?.constraints = [SCNLookAtConstraint(target: self.scnNode?.presentation)]
 	}
@@ -56,12 +56,12 @@ class Player {
 	//Player animation:
 	
 	func setupThePlayer() {
-		self.scnNode = gameViewController.levelScene.rootNode.childNode(withName: "playerObject reference", recursively: true)!
+		self.scnNode = gameViewController.levelScene?.rootNode.childNode(withName: "playerObject reference", recursively: true)
 		scnNode?.physicsBody = SCNPhysicsBody(type: .dynamic, shape: nil)
 		scnNode?.physicsBody?.isAffectedByGravity = true
 		scnNode?.physicsBody?.categoryBitMask = PhysicsCategory.Player
 		scnNode?.physicsBody?.collisionBitMask = PhysicsCategory.Wall | PhysicsCategory.Floor
-		scnNode?.physicsBody?.contactTestBitMask = PhysicsCategory.WinningPearl | PhysicsCategory.Pearl | PhysicsCategory.Enemy
+		scnNode?.physicsBody?.contactTestBitMask = PhysicsCategory.WinningPearl | PhysicsCategory.Pearl | PhysicsCategory.Enemy | PhysicsCategory.firstCornerNode | PhysicsCategory.secondCornerNode
 	}
 	
 	func animateTransparency() {
@@ -93,16 +93,13 @@ class Player {
 		}
 	}
 	
-	func updateThePlayerInNewScene() {
-		setupThePlayer()
-		resetPlayersPosition()
-	}
-	
 	func resetPlayersPosition() { scnNode?.position = nodesStartingPosition }
 	
 	//camera:
 	func updateCameraThatFollowsThePlayer() {
-		if cameraNode != nil && !cameraShaking { cameraNode!.position = scnNode!.presentation.position }
+		if cameraNode != nil && !cameraShaking {
+			if scnNode != nil { cameraNode!.position = (scnNode?.presentation.position)! }
+		}
 	}
 	
 	func cameraShake() {

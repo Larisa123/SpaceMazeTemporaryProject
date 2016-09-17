@@ -15,10 +15,18 @@ enum GameState {
 	case gameOver
 }
 
+enum TutorialState {
+	case firstTap
+	case secondTap
+	case tapToComplete
+	case completed
+}
+
 
 class Game {
 	var level = 1
 	var state: GameState = .tapToPlay
+	var tutorialState: TutorialState = .firstTap
 
 	var sounds: [String:SCNAudioSource] = [:]
 	var gameViewController: GameViewController!
@@ -37,15 +45,15 @@ class Game {
 	// Camera (in .TapToPlay mode):
 	
 	func setupRotatingCamera() {
-		newGameCamera = gameViewController.levelScene.rootNode.childNode(withName: "newGameCamera", recursively: true)!
-		newGameCameraSelfieStickNode = gameViewController.levelScene.rootNode.childNode(withName: "newGameCameraSelfieStick reference", recursively: true)!
+		newGameCamera = gameViewController.levelScene?.rootNode.childNode(withName: "newGameCamera", recursively: true)
+		newGameCameraSelfieStickNode = gameViewController.levelScene?.rootNode.childNode(withName: "newGameCameraSelfieStick reference", recursively: true)
 		newGameCamera?.constraints = [SCNLookAtConstraint(target: gameViewController.floor)]
 	}
 	
 	func switchToRotatingCamera() {
 		gameViewController.scnView.pointOfView = newGameCamera
 		gameViewController.hudScene.hideController()
-		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: false)
+		gameViewController.hudScene.makeHealthBar(visible: false)
 		
 		gameViewController.hudScene.setLabel(text: "Tap To Play!")
 	}
@@ -65,8 +73,11 @@ class Game {
 			switchToRotatingCamera()
 			gameViewController.scnView.overlaySKScene = gameViewController.hudScene
 			gameViewController.hudScene.restoreHealthToFull()
-			gameViewController.hudScene.setLabel(text: "Level \(level-1) cleared! Tap To Play!")
-		} else { gameViewController.hudScene.setLabel(text: "Game Over! Tap To Play Again!") }
+			gameViewController.hudScene.setLabel(text: "Level \(level-1) cleared!\nTap To Play!")
+		} else {
+			gameViewController.hudScene.setLabel(text: "Game Over!\nTap To Play Again!")
+			gameViewController.playerClass.resetPlayersPosition()
+		}
 		
 		//level cleared and restart the game should have diffrent labels
 		gameViewController.scnView.pointOfView = newGameCamera
@@ -77,11 +88,41 @@ class Game {
 		gameViewController.scnView.pointOfView = gameViewController.playerClass.camera
 		gameViewController.hudScene.hideLabel()
 		gameViewController.hudScene.showController()
-		gameViewController.hudScene.makeHealthBarVisibleOrInvisible(visible: true)
+		gameViewController.playerClass.resetPlayersPosition()
+		gameViewController.hudScene.restoreHealthToFull()
+		gameViewController.hudScene.makeHealthBar(visible: true)
 		
 		state = .play
+		if level == 1 { tutorial() }
 	}
+	
+	func tutorial() {
+		switch tutorialState {
+		case .firstTap:
+			gameViewController.hudScene.setLabel(text: "Tutorial")
+			performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["right"]!)
+		case .secondTap: performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["down"]!)
+		case .tapToComplete: gameViewController.hudScene.setLabel(text: "You have completed tutorial!\n Tap To Play")
+		case .completed: return
+		}
+	}
+	func performScalingActionOn(nodes: [SKSpriteNode]) {
+		for node in nodes {
+			let scaleUpAndDown = SKAction.sequence([SKAction.scale(to: 1.1, duration: 1.5), SKAction.scale(to: 0.9, duration: 1.5)])
+			node.run(SKAction.repeatForever(scaleUpAndDown))
+		}
+	}
+	func tutorialNextStep(stopActionForName name: String) {
+		for node in gameViewController.hudScene.arrowDictionary[name]! {
+			node.removeAllActions()
+			node.size = CGSize(width: 75, height: 75)
+		}
 		
+		if gameViewController.game.tutorialState == .firstTap { gameViewController.game.tutorialState = .secondTap }
+		else if gameViewController.game.tutorialState == .secondTap { gameViewController.game.tutorialState = .tapToComplete }
+		gameViewController.game.tutorial()
+	}
+	
 	func gameOver() {
 		state = .gameOver
 		newGameDisplay(newLevel: false)
@@ -100,28 +141,34 @@ class Game {
 		if nodeMask == PhysicsCategory.Pearl {
 			node.removeFromParentNode() // otherwise the player can wait on pearls to reappear and collect points
 			gameViewController.hudScene.changeHealth(collidedWithPearl: true)
-				playSound(node: gameViewController.playerClass.scnNode, name: "PowerUp")
+			playSound(node: gameViewController.playerClass.scnNode, name: "PowerUp")
 			
 		} else if nodeMask == PhysicsCategory.Enemy {
 			node.runAction(SCNAction.waitForDurationThenRunBlock(12.0) { node in node.isHidden = false })
 			gameViewController.playerClass.cameraShake()
 			gameViewController.playerClass.animateTransparency()
+			playSound(node: gameViewController.playerClass.scnNode, name: "PowerDown")
 			gameViewController.hudScene.changeHealth(collidedWithPearl: false)
 		}
 	}
 	func collisionWithWinningPearl(_ pearl: SCNNode) {
-		pearl.removeFromParentNode()
+		if tutorialState == .tapToComplete {
+			tutorialState = .completed
+			tutorial()
+			state = .tapToPlay
+			return
+		}
+		
+		playSound(node: gameViewController.playerClass.scnNode, name: "LevelUp")
 		newGameDisplay(newLevel: true) //sets pointOfView: newGameCamera, hides controller, sets state to .TapToPlay, restores health
-		//add particle system?
+		//add explosion particle system
 	}
 	
 	func createExplosion(_ explosion: SCNParticleSystem, node: SCNNode, withGeometry geometry: SCNGeometry, atPosition position: SCNVector3) {
 		let translationMatrix = SCNMatrix4MakeTranslation(position.x, position.y, position.z)
 		explosion.emitterShape = geometry
 		
-		gameViewController.levelScene.addParticleSystem(explosion, transform: translationMatrix)
-	
-		playSound(node: node, name: "Explosion")
+		gameViewController.levelScene?.addParticleSystem(explosion, transform: translationMatrix)	
 	}
 	
 	//Sounds:
@@ -134,14 +181,13 @@ class Game {
 	
 	func playSound(node:SCNNode?, name:String) {
 		if node != nil {
-			let sound = sounds[name]
-			node!.runAction(SCNAction.playAudio(sound!, waitForCompletion: true))
+			if let sound = sounds[name] { node!.runAction(SCNAction.playAudio(sound, waitForCompletion: true)) }
 		}
 	}
 	
 	func setupSounds() {
 		loadSound("WallCrash", fileNamed: "art.scnassets/Sounds/WallCrash.wav")
-		loadSound("Explosion", fileNamed: "art.scnassets/Sounds/Explosion.wav")
+		loadSound("PowerDown", fileNamed: "art.scnassets/Sounds/Explosion.wav")
 		loadSound("LevelUp", fileNamed: "art.scnassets/Sounds/LevelUp.mp3")
 		loadSound("PowerUp", fileNamed: "art.scnassets/Sounds/PowerUp.mp3")
 	}

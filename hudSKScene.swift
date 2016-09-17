@@ -15,14 +15,7 @@ class hudSKSScene: SKScene {
 	var labelNode: SKLabelNode!
 	var gameViewController: GameViewController!
 	
-	var arrows: [SKSpriteNode: SKSpriteNode] = [SKSpriteNode: SKSpriteNode]()
-	
-	/*
-	var arrowUp: SKSpriteNode!
-	var arrowRight: SKSpriteNode!
-	var arrowDown: SKSpriteNode!
-	var arrowLeft: SKSpriteNode!
-	*/
+	var arrowDictionary: [String: [SKSpriteNode]] = [String: [SKSpriteNode]]()
 	
 	//Hearts:
 	var lives = 9
@@ -43,22 +36,11 @@ class hudSKSScene: SKScene {
 		let scale: CGFloat = (UIDevice.current.userInterfaceIdiom == .pad) ? 1.5 : 1
 		
 		setupArrows(scale: scale)
-		setupController(scale: scale)
 		setupHealthBar(scale: scale)
 		setupLabelNode(scale: scale)
 	}
 	
-	func setupController(scale: CGFloat) {
-		
-		controller = SKSpriteNode(imageNamed: "art.scnassets/circle-grey.png")
-		controller.alpha = 0.2
-		controller.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-		controllerRadius = 65.0 * scale
-		controller.size = CGSize(width: controllerRadius*2*scale, height: controllerRadius*2*scale)
-		controller.position = CGPoint(x: controllerRadius * 1.2 * scale, y: controllerRadius * 1.2 * scale)
-		
-		self.addChild(controller)
-	}
+	// Controller:
 	
 	func setupArrows(scale: CGFloat) {
 		let controllerScene = SKScene(fileNamed: "controllerScene.sks")
@@ -76,20 +58,31 @@ class hudSKSScene: SKScene {
 		let arrowLeftPressed = arrowsPressedNode?.childNode(withName: "leftPressed") as! SKSpriteNode
 		let arrowRightPressed = arrowsPressedNode?.childNode(withName: "rightPressed") as! SKSpriteNode
 		
-		arrows[arrowUp] = arrowUpPressed
-		arrows[arrowDown] = arrowDownPressed
-		arrows[arrowLeft] = arrowLeftPressed
-		arrows[arrowRight] = arrowRightPressed
+		arrowDictionary["up"] = [arrowUp, arrowUpPressed]
+		arrowDictionary["down"] = [arrowDown, arrowDownPressed]
+		arrowDictionary["left"] = [arrowLeft, arrowLeftPressed]
+		arrowDictionary["right"] = [arrowRight, arrowRightPressed]
 		
 		let arrowsCenter = CGPoint(x: 130, y: 130)
 		arrowsNode?.position = arrowsCenter
 		arrowsPressedNode?.position = arrowsCenter
 		
-		for (arrow, arrowPressed) in arrows {
-			arrow.isHidden = true
-			arrowPressed.isHidden = true
-			arrow.move(toParent: self)
-			arrowPressed.move(toParent: self)
+		for arrowArray in arrowDictionary.values {
+			for arrow in arrowArray {
+				arrow.isHidden = true
+				arrow.move(toParent: self)
+			}
+		}
+	}
+	
+	func hideController() {
+		for arrowArray in arrowDictionary.values {
+			for arrow in arrowArray { arrow.isHidden = true }
+		}
+	}
+	func showController() {
+		for arrowArray in arrowDictionary.values {
+			for arrow in arrowArray { arrow.isHidden = false }
 		}
 	}
 	
@@ -118,7 +111,7 @@ class hudSKSScene: SKScene {
 		lives = 9
 	}
 	
-	func makeHealthBarVisibleOrInvisible(visible: Bool) {
+	func makeHealthBar(visible: Bool) {
 		for heart in hearts { heart.isHidden = visible ? false: true }
 	}
 	
@@ -154,28 +147,13 @@ class hudSKSScene: SKScene {
 		}
 	}
 	
-	func hideController() {
-		for (arrow, arrowPressed) in arrows {
-			arrow.isHidden = true
-			arrowPressed.isHidden = true
-		}
-		controller.isHidden = true
-	}
-	func showController() {
-		for (arrow, arrowPressed) in arrows {
-			arrow.isHidden = false
-			arrowPressed.isHidden = false
-		}
-		controller.isHidden = false
-	}
-	
 	//Label:
 	
 	func setupLabelNode(scale: CGFloat) {
-		labelNode = SKLabelNode(fontNamed: "Vollkorn")
+		labelNode = SKLabelNode(fontNamed: "GillSans-UltraBold")
 		labelNode.fontColor = UIColor.white
 		labelNode.fontSize = (scale == 1) ? 36: 72
-		labelNode.position = CGPoint(x: gameViewController.deviceSize.width / 2, y: gameViewController.deviceSize.height * 0.9)
+		labelNode.position = CGPoint(x: gameViewController.deviceSize.width / 2, y: gameViewController.deviceSize.height * 0.85)
 		labelNode.isHidden = true
 		addChild(labelNode)
 	}
@@ -183,10 +161,14 @@ class hudSKSScene: SKScene {
 	func setLabel(text: String) {
 		labelNode.text = text
 		showLabel()
+		if text == "Tutorial" { return }
 		let scaleUpAndDown = SKAction.sequence([SKAction.scale(to: 1.1, duration: 1.5), SKAction.scale(to: 0.9, duration: 1.5)])
 		labelNode.run(SKAction.repeatForever(scaleUpAndDown))
 	}
-	func hideLabel() { labelNode.isHidden = true }
+	func hideLabel() {
+		labelNode.isHidden = true
+		labelNode.removeAllActions()
+	}
 	func showLabel() { labelNode.isHidden = false }
 	
 	//Touches:
