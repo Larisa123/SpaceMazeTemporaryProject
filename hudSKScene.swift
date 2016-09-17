@@ -15,10 +15,14 @@ class hudSKSScene: SKScene {
 	var labelNode: SKLabelNode!
 	var gameViewController: GameViewController!
 	
+	var arrows: [SKSpriteNode: SKSpriteNode] = [SKSpriteNode: SKSpriteNode]()
+	
+	/*
 	var arrowUp: SKSpriteNode!
 	var arrowRight: SKSpriteNode!
 	var arrowDown: SKSpriteNode!
 	var arrowLeft: SKSpriteNode!
+	*/
 	
 	//Hearts:
 	var lives = 9
@@ -38,41 +42,13 @@ class hudSKSScene: SKScene {
 		
 		let scale: CGFloat = (UIDevice.current.userInterfaceIdiom == .pad) ? 1.5 : 1
 		
+		setupArrows(scale: scale)
 		setupController(scale: scale)
 		setupHealthBar(scale: scale)
 		setupLabelNode(scale: scale)
 	}
 	
 	func setupController(scale: CGFloat) {
-		let wideSize: CGFloat = 90 * scale
-		let narrowSize: CGFloat = 45 * scale
-		
-		//controller buttons:
-		arrowUp = SKSpriteNode(imageNamed: "art.scnassets/arrowUp.png")
-		arrowRight = SKSpriteNode(imageNamed: "art.scnassets/arrowRight.png")
-		arrowDown = SKSpriteNode(imageNamed: "art.scnassets/arrowDown.png")
-		arrowLeft = SKSpriteNode(imageNamed: "art.scnassets/arrowLeft.png")
-		
-		for arrow in [arrowUp, arrowDown] {
-			arrow?.anchorPoint = CGPoint.zero
-			arrow?.size = CGSize(width: wideSize, height: narrowSize)
-			arrow?.position.x = narrowSize * 1.2
-		}
-		arrowDown.position.y = narrowSize * 0.2
-		arrowUp.position.y = arrowDown.position.y + arrowDown.size.height + wideSize
-		
-		for arrow in [arrowRight, arrowLeft] {
-			arrow?.anchorPoint = CGPoint.zero
-			arrow?.size = CGSize(width: narrowSize, height: wideSize)
-			arrow?.position.y =  arrowDown.position.y + arrowDown.size.height
-		}
-		arrowLeft.position.x = narrowSize * 0.2
-		arrowRight.position.x = arrowLeft.position.x + arrowLeft.size.width + wideSize
-
-		for arrow in [arrowUp, arrowDown, arrowRight, arrowLeft] {
-			arrow?.isHidden = true
-			addChild(arrow!)
-		}
 		
 		controller = SKSpriteNode(imageNamed: "art.scnassets/circle-grey.png")
 		controller.alpha = 0.2
@@ -84,18 +60,53 @@ class hudSKSScene: SKScene {
 		self.addChild(controller)
 	}
 	
+	func setupArrows(scale: CGFloat) {
+		let controllerScene = SKScene(fileNamed: "controllerScene.sks")
+		
+		let arrowsNode = controllerScene?.childNode(withName: "arrows")
+		let arrowsPressedNode = controllerScene?.childNode(withName: "arrowsPressed")
+		
+		let arrowUp = arrowsNode?.childNode(withName: "up") as! SKSpriteNode
+		let arrowDown = arrowsNode?.childNode(withName: "down") as! SKSpriteNode
+		let arrowLeft = arrowsNode?.childNode(withName: "left") as! SKSpriteNode
+		let arrowRight = arrowsNode?.childNode(withName: "right") as! SKSpriteNode
+		
+		let arrowUpPressed = arrowsPressedNode?.childNode(withName: "upPressed") as! SKSpriteNode
+		let arrowDownPressed = arrowsPressedNode?.childNode(withName: "downPressed") as! SKSpriteNode
+		let arrowLeftPressed = arrowsPressedNode?.childNode(withName: "leftPressed") as! SKSpriteNode
+		let arrowRightPressed = arrowsPressedNode?.childNode(withName: "rightPressed") as! SKSpriteNode
+		
+		arrows[arrowUp] = arrowUpPressed
+		arrows[arrowDown] = arrowDownPressed
+		arrows[arrowLeft] = arrowLeftPressed
+		arrows[arrowRight] = arrowRightPressed
+		
+		let arrowsCenter = CGPoint(x: 130, y: 130)
+		arrowsNode?.position = arrowsCenter
+		arrowsPressedNode?.position = arrowsCenter
+		
+		for (arrow, arrowPressed) in arrows {
+			arrow.isHidden = true
+			arrowPressed.isHidden = true
+			arrow.move(toParent: self)
+			arrowPressed.move(toParent: self)
+		}
+	}
+	
 	//Health bar:
 	
 	func setupHealthBar(scale: CGFloat) {
 		let heartSize =  CGSize(width: 30 * scale, height: 30 * scale)
 		
 		for i in 0..<3 {
-			let heart = SKSpriteNode(imageNamed: "art.scnassets/heart.png")
-			heart.size = heartSize
-			heart.position = CGPoint(x: heartSize.width + CGFloat(i) * heartSize.width * 1.1, y: gameViewController.deviceSize.height * 0.95)
-			heart.isHidden = true
-			hearts.append(heart)
-			addChild(heart)
+			let heart: SKSpriteNode? = SKSpriteNode(imageNamed: "art.scnassets/heart.png")
+			heart?.size = heartSize
+			heart?.position = CGPoint(x: heartSize.width + CGFloat(i) * heartSize.width * 1.1, y: gameViewController.deviceSize.height * 0.95)
+			heart?.isHidden = true
+			if heart != nil {
+				hearts.append(heart!)
+				addChild(heart!)
+			}
 		}
 	}
 	
@@ -144,14 +155,16 @@ class hudSKSScene: SKScene {
 	}
 	
 	func hideController() {
-		for arrow in [arrowUp, arrowDown, arrowRight, arrowLeft] {
-			arrow?.isHidden = true
+		for (arrow, arrowPressed) in arrows {
+			arrow.isHidden = true
+			arrowPressed.isHidden = true
 		}
 		controller.isHidden = true
 	}
 	func showController() {
-		for arrow in [arrowUp, arrowDown, arrowRight, arrowLeft] {
-			arrow?.isHidden = false
+		for (arrow, arrowPressed) in arrows {
+			arrow.isHidden = false
+			arrowPressed.isHidden = false
 		}
 		controller.isHidden = false
 	}
@@ -187,34 +200,21 @@ class hudSKSScene: SKScene {
 			case .tapToPlay: gameViewController.game.startTheGame()
 			case .play:
 				for touch in touches {
-					if (atPoint(touch.location(in: self)) == controller) {
-						let touchLocationInController = touch.location(in: controller)
+					if let spriteAtPoint = atPoint(touch.location(in: self)) as? SKSpriteNode {
+						gameViewController.playerClass.moving = true
+
+						let spriteName: String = spriteAtPoint.name!
 						
-						if isTouchOnTheOutsideEdge(touchLocation: touchLocationInController) {
-							gameViewController.playerClass.moving = true
-							
-							let angle = atan2(touchLocationInController.y, touchLocationInController.x) * 180 / pi // in degrees
-							
-							switch angle {
-							case -125...(-55): gameViewController.playerClass.direction = .backward
-							case -35...35: gameViewController.playerClass.direction = .right
-							case 55...125: gameViewController.playerClass.direction = .forward
-							case 145...180, -180...(-145): gameViewController.playerClass.direction = .left
-							default:
-								gameViewController.playerClass.moving = false
-								return
-							}
-							gameViewController.playerClass.playerRoll()
+						switch spriteName {
+						case "up": gameViewController.playerClass.direction = .forward
+						case "down": gameViewController.playerClass.direction = .backward
+						case "left": gameViewController.playerClass.direction = .left
+						case "right": gameViewController.playerClass.direction = .right
+						default:
+							gameViewController.playerClass.moving = false
+							return
 						}
-					}
-					if (atPoint(touch.location(in: self)) == arrowDown) {
-						gameViewController.playerClass.direction = .backward
-					} else if (atPoint(touch.location(in: self)) == arrowRight) {
-						gameViewController.playerClass.direction = .right
-					} else if (atPoint(touch.location(in: self)) == arrowUp) {
-						gameViewController.playerClass.direction = .forward
-					} else if (atPoint(touch.location(in: self)) == arrowLeft) {
-						gameViewController.playerClass.direction = .left
+						gameViewController.playerClass.playerRoll()
 					}
 				}
 			case .gameOver: gameViewController.game.newGameDisplay(newLevel: false)
