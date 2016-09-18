@@ -179,7 +179,11 @@ class hudSKSScene: SKScene {
 	
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
 		switch gameViewController.game.state {
-			case .tapToPlay: gameViewController.game.startTheGame()
+			case .tapToPlay:
+				if gameViewController.game.level == 1 && gameViewController.game.tutorialState == .completed {
+					gameViewController.game.newGameDisplay(newLevel: true)
+				}
+				gameViewController.game.startTheGame()
 			case .play:
 				for touch in touches {
 					if let spriteAtPoint = atPoint(touch.location(in: self)) as? SKSpriteNode {

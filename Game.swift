@@ -18,7 +18,8 @@ enum GameState {
 enum TutorialState {
 	case firstTap
 	case secondTap
-	case tapToComplete
+	case winToComplete
+	case wonToComplete
 	case completed
 }
 
@@ -96,33 +97,6 @@ class Game {
 		if level == 1 { tutorial() }
 	}
 	
-	func tutorial() {
-		switch tutorialState {
-		case .firstTap:
-			gameViewController.hudScene.setLabel(text: "Tutorial")
-			performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["right"]!)
-		case .secondTap: performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["down"]!)
-		case .tapToComplete: gameViewController.hudScene.setLabel(text: "You have completed tutorial!\n Tap To Play")
-		case .completed: return
-		}
-	}
-	func performScalingActionOn(nodes: [SKSpriteNode]) {
-		for node in nodes {
-			let scaleUpAndDown = SKAction.sequence([SKAction.scale(to: 1.1, duration: 1.5), SKAction.scale(to: 0.9, duration: 1.5)])
-			node.run(SKAction.repeatForever(scaleUpAndDown))
-		}
-	}
-	func tutorialNextStep(stopActionForName name: String) {
-		for node in gameViewController.hudScene.arrowDictionary[name]! {
-			node.removeAllActions()
-			node.size = CGSize(width: 75, height: 75)
-		}
-		
-		if gameViewController.game.tutorialState == .firstTap { gameViewController.game.tutorialState = .secondTap }
-		else if gameViewController.game.tutorialState == .secondTap { gameViewController.game.tutorialState = .tapToComplete }
-		gameViewController.game.tutorial()
-	}
-	
 	func gameOver() {
 		state = .gameOver
 		newGameDisplay(newLevel: false)
@@ -152,14 +126,14 @@ class Game {
 		}
 	}
 	func collisionWithWinningPearl(_ pearl: SCNNode) {
-		if tutorialState == .tapToComplete {
-			tutorialState = .completed
+		playSound(node: gameViewController.playerClass.scnNode, name: "LevelUp") // the sound effect should play in any case
+		
+		if level == 1 && tutorialState == .wonToComplete {
 			tutorial()
-			state = .tapToPlay
 			return
 		}
+		print("new level with tutorial: \(tutorialState != .completed)")
 		
-		playSound(node: gameViewController.playerClass.scnNode, name: "LevelUp")
 		newGameDisplay(newLevel: true) //sets pointOfView: newGameCamera, hides controller, sets state to .TapToPlay, restores health
 		//add explosion particle system
 	}
@@ -169,6 +143,47 @@ class Game {
 		explosion.emitterShape = geometry
 		
 		gameViewController.levelScene?.addParticleSystem(explosion, transform: translationMatrix)	
+	}
+	
+	//Tutorial:
+	
+	func tutorial() {
+		switch tutorialState {
+		case .firstTap:
+			gameViewController.hudScene.setLabel(text: "Tutorial")
+			performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["right"]!)
+			gameViewController.game.tutorialState = .secondTap
+			return
+		case .secondTap:
+			removeNodesActions(name: "right")
+			gameViewController.game.tutorialState = .winToComplete
+			performScalingActionOn(nodes: gameViewController.hudScene.arrowDictionary["down"]!)
+			return
+		case .winToComplete:
+			removeNodesActions(name: "down")
+			gameViewController.game.tutorialState = .wonToComplete
+			return
+		case .wonToComplete:
+			gameViewController.hudScene.setLabel(text: "You have completed tutorial!\n Tap To Play")
+			gameViewController.game.tutorialState = .completed
+			gameViewController.game.state = .tapToPlay
+			return
+		case .completed: return
+		}
+	}
+	
+	func performScalingActionOn(nodes: [SKSpriteNode]) {
+		for node in nodes {
+			let scaleUpAndDown = SKAction.sequence([SKAction.scale(to: 1.1, duration: 1.5), SKAction.scale(to: 0.9, duration: 1.5)])
+			node.run(SKAction.repeatForever(scaleUpAndDown))
+		}
+	}
+	
+	func removeNodesActions(name: String) {
+		for node in gameViewController.hudScene.arrowDictionary[name]! {
+			node.removeAllActions()
+			node.size = CGSize(width: 75, height: 75)
+		}
 	}
 	
 	//Sounds:

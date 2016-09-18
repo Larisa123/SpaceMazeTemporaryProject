@@ -21,9 +21,8 @@ struct PhysicsCategory {
 	static let Pearl: Int = 4
 	static let Enemy: Int = 8
 	static let WinningPearl: Int = 16
-	static let firstCornerNode: Int = 32
-	static let secondCornerNode: Int = 64
-	static let Floor: Int = 128
+	static let CornerNode: Int = 32
+	static let Floor: Int = 64
 }
 
 var backgroundMusicPlayer:AVAudioPlayer = AVAudioPlayer()
@@ -46,6 +45,8 @@ class GameViewController: UIViewController {
 	var playerClass: Player!
 	var winningPearl: SCNNode?
 	var firstCornerNode: SCNNode?
+	
+	var collisionCounter = 1 // this ensures contact with objects is only detected once
 	
 	//HUD
 	var hudScene: hudSKSScene!
@@ -128,21 +129,14 @@ class GameViewController: UIViewController {
 					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 					node.addParticleSystem(self.enemyParticleSystem)
 				}
+			} else {
+				if node.name == "CornerNode" {
+					node.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
+					node.physicsBody?.categoryBitMask = PhysicsCategory.CornerNode
+					node.physicsBody?.collisionBitMask = PhysicsCategory.None
+					node.physicsBody?.contactTestBitMask = PhysicsCategory.Player
+				}
 			}
-		}
-		
-		if currentLevel == 1 {
-			let firstCornerNode = levelScene?.rootNode.childNode(withName: "firstCornerNode", recursively: true)
-			firstCornerNode?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
-			firstCornerNode?.physicsBody?.categoryBitMask = PhysicsCategory.firstCornerNode
-			firstCornerNode?.physicsBody?.collisionBitMask = PhysicsCategory.None
-			firstCornerNode?.physicsBody?.contactTestBitMask = PhysicsCategory.Player
-			
-			let secondCornerNode = levelScene?.rootNode.childNode(withName: "secondCornerNode", recursively: true)
-			secondCornerNode?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
-			secondCornerNode?.physicsBody?.categoryBitMask = PhysicsCategory.secondCornerNode
-			secondCornerNode?.physicsBody?.collisionBitMask = PhysicsCategory.None
-			secondCornerNode?.physicsBody?.contactTestBitMask = PhysicsCategory.Player
 		}
 		
 		floor = levelScene?.rootNode.childNode(withName: "floorObject reference", recursively: true)
@@ -151,7 +145,6 @@ class GameViewController: UIViewController {
 		floor?.physicsBody?.collisionBitMask = PhysicsCategory.Player
 		floor?.physicsBody?.contactTestBitMask = PhysicsCategory.None
 		
-		//winning pearl
 		winningPearl = levelScene?.rootNode.childNode(withName: "winningPearl reference", recursively: true)
 		winningPearl?.physicsBody = SCNPhysicsBody(type: .static, shape: nil)
 		winningPearl?.physicsBody?.categoryBitMask = PhysicsCategory.WinningPearl
@@ -163,12 +156,9 @@ class GameViewController: UIViewController {
 	func setupGameClass() {
 		game = Game(gameViewController: self)
 		game.level = currentLevel
-
 	}
 	
-	
 	override func didReceiveMemoryWarning() { print("memory warning") }
-	
 	override var prefersStatusBarHidden: Bool { get { return true } }
 }
 
@@ -196,22 +186,23 @@ extension GameViewController: SCNPhysicsContactDelegate {
 			if contact.nodeA.categoryBitMask == PhysicsCategory.Player { otherNode = contact.nodeB }
 			else { otherNode = contact.nodeA }
 			
-			if currentLevel == 1 {
-				if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.firstCornerNode {
-					game.tutorialNextStep(stopActionForName: "right")
-				} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.secondCornerNode {
-					game.tutorialNextStep(stopActionForName: "down")
+			
+			if currentLevel == 1 && otherNode.physicsBody?.categoryBitMask == PhysicsCategory.CornerNode {
+				if collisionCounter == 1 {
+					otherNode.removeFromParentNode()
+					print("cornerHit")
+					game.tutorial()
 				}
 			}
-			
-			
-			if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Wall {
-				game.playSound(node: otherNode, name: "WallCrash")
+			else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Wall {
+				if collisionCounter == 1 { game.playSound(node: otherNode, name: "WallCrash") }
 			} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Pearl || otherNode.physicsBody?.categoryBitMask == PhysicsCategory.Enemy {
-				game.collisionWithNode(otherNode)
+				if collisionCounter == 1 { game.collisionWithNode(otherNode) }
 			} else if otherNode.physicsBody?.categoryBitMask == PhysicsCategory.WinningPearl {
-				game.collisionWithWinningPearl(otherNode)
-			}
+				if collisionCounter == 1 { game.collisionWithWinningPearl(otherNode) }
+			} else {return }
+			collisionCounter += 1
+			playerClass.scnNode?.runAction(SCNAction.waitForDurationThenRunBlock(0.2, block: {node in self.collisionCounter = 1 }))
 		}
 	}
 }

@@ -61,7 +61,7 @@ class Player {
 		scnNode?.physicsBody?.isAffectedByGravity = true
 		scnNode?.physicsBody?.categoryBitMask = PhysicsCategory.Player
 		scnNode?.physicsBody?.collisionBitMask = PhysicsCategory.Wall | PhysicsCategory.Floor
-		scnNode?.physicsBody?.contactTestBitMask = PhysicsCategory.WinningPearl | PhysicsCategory.Pearl | PhysicsCategory.Enemy | PhysicsCategory.firstCornerNode | PhysicsCategory.secondCornerNode
+		scnNode?.physicsBody?.contactTestBitMask = PhysicsCategory.WinningPearl | PhysicsCategory.Pearl | PhysicsCategory.Enemy | PhysicsCategory.CornerNode 
 	}
 	
 	func animateTransparency() {
